@@ -92,8 +92,10 @@ class GeminiService:
                         logger.warning(f"Rate limit hit. Retrying in {sleep_time}s...")
                         await asyncio.sleep(sleep_time)
                         continue
+                    else:
+                        return "Error: Rate limit exceeded (Quota exhausted)."
                 
-                logger.error(f"Gemini generation error: {e}")
+                logger.error(f"Gemini generation error: {repr(e)}")
                 return f"Error generating response: {e}"
 
         return "Error: Rate limit exceeded."
