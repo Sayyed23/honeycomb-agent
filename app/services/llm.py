@@ -1,7 +1,10 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from app.core.config import settings
 import logging
 from typing import List, Dict, Any
+import asyncio
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -10,11 +13,10 @@ class GeminiService:
         self.api_key = settings.GOOGLE_API_KEY
         if not self.api_key:
             logger.warning("GOOGLE_API_KEY not set. GeminiService disabled.")
-            self.model = None
+            self.client = None
         else:
-            genai.configure(api_key=self.api_key)
-            # Using gemini-2.0-flash as it is available for this key
-            self.model = genai.GenerativeModel('gemini-2.0-flash')
+            self.client = genai.Client(api_key=self.api_key)
+            self.model_name = 'gemini-2.0-flash'
 
     async def generate_response(
         self, 
@@ -23,57 +25,77 @@ class GeminiService:
         user_input: str
     ) -> str:
         """
-        Generate a response from the agent.
-        
-        Args:
-            system_prompt: Instructions for behavior/persona.
-            history: List of {"role": "user"|"model", "parts": ["text"]}
-            user_input: The new message from the scammer.
-            
-        Returns:
-            The agent's text response.
+        Generate a response from the agent using google-genai SDK.
+        Includes retry logic for 429 errors.
         """
-        if not self.model:
+        if not self.client:
             return "Error: Service not configured."
 
-        try:
-            # We will construct a chat session.
-            # Strategy: Prepend system prompt to the first user message or handle it as context.
-            # Since `start_chat` expects a specific history format, we need to adapt.
+        # Construct content for the model
+        contents = []
+        
+        # System instructions
+        # The new SDK supports system_instruction='...' in generate_content, but we can also just prepend it.
+        # Let's use the explicit argument if possible, or context injection.
+        # For simplicity and robustness with chat history, we'll use config.
+        
+        # Convert history
+        for msg in history:
+            role = "user" if msg.get("role") in ["user", "scammer"] else "model"
+            parts = msg.get("parts", [])
+            if isinstance(msg.get("content"), str):
+                parts = [msg["content"]]
             
-            # Simple adaptation:
-            # If history is empty, the first message sent to `send_message` will just include system prompt + user input.
-            # If history exists, we try to restart the chat with history.
+            # parts needs to be list of text
+            text_parts = parts if isinstance(parts, list) else [str(parts)]
             
-            converted_history = []
-            for msg in history:
-                role = "user" if msg.get("role") in ["user", "scammer"] else "model"
-                parts = msg.get("parts", [])
-                # Ensure parts is a list of strings or convert content
-                if isinstance(msg.get("content"), str):
-                    parts = [msg["content"]]
-                
-                converted_history.append({
-                    "role": role,
-                    "parts": parts if isinstance(parts, list) else [str(parts)]
-                })
+            contents.append(types.Content(
+                role=role,
+                parts=[types.Part.from_text(text=p) for p in text_parts]
+            ))
+            
+        # Add current user input
+        contents.append(types.Content(
+            role="user",
+            parts=[types.Part.from_text(text=user_input)]
+        ))
 
-            # Start chat with history
-            chat = self.model.start_chat(history=converted_history)
-            
-            # Combine system prompt with user input for the immediate turn if it's effectively a new context
-            # or simply prepend system prompt if history is empty.
-            # If history is not empty, we can't easily inject system prompt into 'history' without messing up turns.
-            # A robust way: context injection in the final prompt.
-            
-            full_prompt = f"{system_prompt}\n\n[INCOMING MESSAGE]: {user_input}"
-            
-            response = await chat.send_message_async(full_prompt)
-            return response.text
-            
-        except Exception as e:
-            logger.error(f"Gemini generation error: {e}")
-            # Fallback or re-raise
-            return "Error generating response."
+        config = types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            temperature=0.7,
+            candidate_count=1
+        )
+
+        # Retry Logic
+        max_retries = 3
+        backoff = 2 # seconds
+        
+        for attempt in range(max_retries + 1):
+            try:
+                # With google-genai 0.x/1.x (client based)
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=contents,
+                    config=config
+                )
+                
+                if response.text:
+                    return response.text
+                return "Error: Empty response."
+
+            except Exception as e:
+                error_str = str(e)
+                # Check for 429
+                if "429" in error_str or "Resource exhausted" in error_str:
+                    if attempt < max_retries:
+                        sleep_time = backoff * (2 ** attempt)
+                        logger.warning(f"Rate limit hit. Retrying in {sleep_time}s...")
+                        await asyncio.sleep(sleep_time)
+                        continue
+                
+                logger.error(f"Gemini generation error: {e}")
+                return f"Error generating response: {e}"
+
+        return "Error: Rate limit exceeded."
 
 llm_service = GeminiService()
