@@ -3,21 +3,16 @@ Tests for the health check endpoint.
 """
 
 import pytest
-from fastapi.testclient import TestClient
 from datetime import datetime
 
-from app.main import app
 
-client = TestClient(app)
-
-
-def test_health_endpoint_returns_200():
+def test_health_endpoint_returns_200(client):
     """Test that health endpoint returns 200 status code."""
     response = client.get("/health")
     assert response.status_code == 200
 
 
-def test_health_endpoint_response_structure():
+def test_health_endpoint_response_structure(client):
     """Test that health endpoint returns expected response structure."""
     response = client.get("/health")
     data = response.json()
@@ -49,14 +44,14 @@ def test_health_endpoint_response_structure():
     datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
 
 
-def test_health_endpoint_no_auth_required():
+def test_health_endpoint_no_auth_required(client):
     """Test that health endpoint doesn't require authentication."""
     # Should work without x-api-key header
     response = client.get("/health")
     assert response.status_code == 200
 
 
-def test_metrics_endpoint_returns_prometheus_format():
+def test_metrics_endpoint_returns_prometheus_format(client):
     """Test that metrics endpoint returns Prometheus format."""
     response = client.get("/metrics")
     assert response.status_code == 200

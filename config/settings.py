@@ -4,9 +4,69 @@ Handles environment variables and application configuration.
 """
 
 from typing import Optional, List
-from pydantic import Field
+from pydantic import Field, validator
 from pydantic_settings import BaseSettings
 import os
+
+
+class DatabaseSettings(BaseSettings):
+    """Database configuration settings."""
+    
+    url: str = Field(
+        default="postgresql://honeypot_user:password@localhost:5432/honeypot_api",
+        description="PostgreSQL database URL"
+    )
+    echo: bool = Field(
+        default=False,
+        description="Enable SQLAlchemy query logging"
+    )
+    pool_size: int = Field(
+        default=10,
+        description="Database connection pool size"
+    )
+    max_overflow: int = Field(
+        default=20,
+        description="Maximum overflow connections"
+    )
+    pool_timeout: int = Field(
+        default=30,
+        description="Connection pool timeout in seconds"
+    )
+    pool_recycle: int = Field(
+        default=3600,
+        description="Connection pool recycle time in seconds"
+    )
+    
+    class Config:
+        env_prefix = "DATABASE_"
+
+
+class RedisSettings(BaseSettings):
+    """Redis configuration settings."""
+    
+    url: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis connection URL"
+    )
+    max_connections: int = Field(
+        default=100,
+        description="Maximum Redis connections"
+    )
+    socket_timeout: int = Field(
+        default=5,
+        description="Redis socket timeout in seconds"
+    )
+    socket_connect_timeout: int = Field(
+        default=5,
+        description="Redis socket connect timeout in seconds"
+    )
+    retry_on_timeout: bool = Field(
+        default=True,
+        description="Retry on Redis timeout"
+    )
+    
+    class Config:
+        env_prefix = "REDIS_"
 
 
 class Settings(BaseSettings):
@@ -24,7 +84,10 @@ class Settings(BaseSettings):
     workers: int = 1
     
     # Database settings
-    database_url: str = "postgresql://test:test@localhost:5432/test"
+    database: DatabaseSettings = DatabaseSettings()
+    
+    # Redis settings
+    redis: RedisSettings = RedisSettings()
     
     # Security settings
     api_key_secret: str = "default-secret"
@@ -37,6 +100,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"  # Ignore extra fields to handle legacy config
     
     def is_development(self) -> bool:
         """Check if running in development mode."""

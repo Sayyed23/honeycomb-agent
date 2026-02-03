@@ -26,9 +26,10 @@ ACTIVE_SESSIONS = Gauge(
     'Number of active conversation sessions'
 )
 
-SCAM_DETECTION_ACCURACY = Gauge(
-    'scam_detection_accuracy',
-    'Current scam detection accuracy'
+SCAM_RISK_SCORE = Histogram(
+    'scam_risk_score',
+    'Distribution of scam risk scores',
+    buckets=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 )
 
 SCAM_DETECTION_COUNT = Counter(
@@ -123,9 +124,7 @@ class MetricsCollector:
         confidence_level = "high" if confidence >= 0.8 else "medium" if confidence >= 0.6 else "low"
         SCAM_DETECTION_COUNT.labels(result=result, confidence_level=confidence_level).inc()
         
-        # Update accuracy gauge (this would be calculated from recent results in practice)
-        if result == "scam_detected":
-            SCAM_DETECTION_ACCURACY.set(min(confidence, 1.0))
+        SCAM_RISK_SCORE.observe(risk_score)
     
     @staticmethod
     def record_agent_activation(persona: str, reason: str):

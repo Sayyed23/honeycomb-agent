@@ -22,16 +22,17 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set the database URL from settings
-config.set_main_option("sqlalchemy.url", settings.database.url)
+# Set the database URL from settings or environment variable
+db_url = os.getenv("DATABASE_URL")
+if not db_url and hasattr(settings, "database") and hasattr(settings.database, "url"):
+    db_url = settings.database.url
+
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
 
 # Import all models to ensure they are registered with SQLAlchemy
-# TODO: Import actual models when they are created
-# from app.models import Base
-# target_metadata = Base.metadata
-
-# For now, set target_metadata to None
-target_metadata = None
+from app.database.models import Base
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:

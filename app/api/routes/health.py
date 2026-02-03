@@ -12,6 +12,8 @@ import asyncio
 from config.settings import settings
 from app.core.logging import get_logger
 from app.core.metrics import get_metrics_response, SYSTEM_HEALTH
+from app.core.redis import redis_manager
+from app.database.connection import check_database_health
 
 logger = get_logger(__name__)
 
@@ -37,9 +39,7 @@ class ComponentHealth:
     async def check_database() -> bool:
         """Check database connectivity."""
         try:
-            # TODO: Implement actual database health check
-            # For now, return True as placeholder
-            return True
+            return await check_database_health()
         except Exception as e:
             logger.error(f"Database health check failed: {e}")
             return False
@@ -48,9 +48,7 @@ class ComponentHealth:
     async def check_redis() -> bool:
         """Check Redis connectivity."""
         try:
-            # TODO: Implement actual Redis health check
-            # For now, return True as placeholder
-            return True
+            return await redis_manager.health_check()
         except Exception as e:
             logger.error(f"Redis health check failed: {e}")
             return False

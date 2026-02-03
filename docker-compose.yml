@@ -13,8 +13,10 @@ services:
       - ENVIRONMENT=development
       - DEBUG=true
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - .:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -31,6 +33,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U honeypot_user -d honeypot_api" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # Redis cache
   redis:
@@ -40,6 +47,11 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # Prometheus for metrics (optional)
   prometheus:

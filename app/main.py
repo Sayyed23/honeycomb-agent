@@ -16,6 +16,8 @@ from config.settings import settings
 from app.api.routes import health, honeypot
 from app.core.logging import setup_logging, get_logger
 from app.core.metrics import setup_metrics, REQUEST_COUNT, REQUEST_DURATION
+from app.core.redis import redis_manager
+from app.core.session_manager import session_manager
 
 # Setup logging
 setup_logging()
@@ -35,7 +37,7 @@ app = FastAPI(
 )
 
 # Add security middleware
-if not settings.is_development():
+if not settings.is_development() and settings.environment != "test":
     app.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=["localhost", "127.0.0.1", "*.railway.app", "*.run.app"]
@@ -59,7 +61,11 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    
+    # Only setting HSTS for HTTPS or non-development environments
+    if request.url.scheme == "https" or not settings.is_development():
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     
     return response
@@ -92,15 +98,19 @@ async def add_request_logging_and_metrics(request: Request, call_next):
     # Calculate duration
     duration = time.time() - start_time
     
+    # Get route template if available to avoid high cardinality
+    route = request.scope.get("route")
+    endpoint = route.path if route else request.url.path
+    
     # Update metrics
     REQUEST_COUNT.labels(
         method=request.method,
-        endpoint=request.url.path,
+        endpoint=endpoint,
         status=response.status_code
     ).inc()
     
     REQUEST_DURATION.labels(
-        endpoint=request.url.path
+        endpoint=endpoint
     ).observe(duration)
     
     # Log request completion
@@ -138,7 +148,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         exc_info=True
     )
     
-    return JSONResponse(
+    response = JSONResponse(
         status_code=500,
         content={
             "status": "error",
@@ -147,6 +157,9 @@ async def global_exception_handler(request: Request, exc: Exception):
             "timestamp": datetime.utcnow().isoformat()
         }
     )
+    
+    response.headers["X-Correlation-ID"] = correlation_id
+    return response
 
 
 # Include routers
@@ -166,12 +179,41 @@ async def startup_event():
             "debug": settings.debug,
         }
     )
+    
+    # Initialize Redis connection
+    try:
+        await redis_manager.initialize()
+        logger.info("Redis connection initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize Redis connection: {e}")
+        # Don't fail startup if Redis is unavailable
+    
+    # Start session cleanup task
+    try:
+        await session_manager.start_cleanup_task(interval_minutes=30)
+        logger.info("Session cleanup task started")
+    except Exception as e:
+        logger.error(f"Failed to start session cleanup task: {e}")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Application shutdown event."""
     logger.info("Application shutting down")
+    
+    # Stop session cleanup task
+    try:
+        await session_manager.stop_cleanup_task()
+        logger.info("Session cleanup task stopped")
+    except Exception as e:
+        logger.error(f"Error stopping session cleanup task: {e}")
+    
+    # Close Redis connection
+    try:
+        await redis_manager.close()
+        logger.info("Redis connection closed")
+    except Exception as e:
+        logger.error(f"Error closing Redis connection: {e}")
 
 
 if __name__ == "__main__":
