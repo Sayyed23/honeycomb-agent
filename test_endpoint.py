@@ -8,8 +8,18 @@ headers = {
     "Content-Type": "application/json"
 }
 data = {
-    "message": "Hello, is this a scam?", 
-    "sessionId": "portal-test-1"
+    "sessionId": "portal-test-new-schema",
+    "message": {
+        "sender": "scammer",
+        "text": "Your bank account will be blocked today. Verify immediately.",
+        "timestamp": "2026-02-04T19:40:00Z"
+    },
+    "conversationHistory": [],
+    "metadata": {
+        "channel": "SMS",
+        "language": "en",
+        "locale": "IN"
+    }
 }
 
 print(f"Sending POST request to {url}...")
