@@ -13,7 +13,7 @@ class DatabaseSettings(BaseSettings):
     """Database configuration settings."""
     
     url: str = Field(
-        default="postgresql://test:test@localhost:5432/test",
+        default="sqlite:///./test.db",
         description="PostgreSQL database URL"
     )
     
@@ -70,6 +70,42 @@ class RedisSettings(BaseSettings):
         env_prefix = "REDIS_"
 
 
+class GUVISettings(BaseSettings):
+    """GUVI integration configuration settings."""
+    
+    callback_url: str = Field(
+        default="https://hackathon.guvi.in/api/updateHoneyPotFinalResult",
+        description="GUVI callback endpoint URL"
+    )
+    api_key: str = Field(
+        default="test-key",
+        description="GUVI API key for authentication"
+    )
+    timeout: int = Field(
+        default=30,
+        description="HTTP request timeout in seconds"
+    )
+    max_retries: int = Field(
+        default=5,
+        description="Maximum number of retry attempts"
+    )
+    retry_backoff_base: float = Field(
+        default=1.0,
+        description="Base delay for exponential backoff in seconds"
+    )
+    retry_backoff_multiplier: float = Field(
+        default=2.0,
+        description="Multiplier for exponential backoff"
+    )
+    retry_max_delay: float = Field(
+        default=300.0,
+        description="Maximum delay between retries in seconds"
+    )
+    
+    class Config:
+        env_prefix = "GUVI_"
+
+
 class Settings(BaseSettings):
     """Main application settings."""
     
@@ -90,12 +126,14 @@ class Settings(BaseSettings):
     # Redis settings
     redis: RedisSettings = RedisSettings()
     
+    # GUVI settings
+    guvi: GUVISettings = GUVISettings()
+    
     # Security settings
     api_key_secret: str = "default-secret"
     
     # External API keys
     gemini_api_key: str = "test-key"
-    guvi_api_key: str = "test-key"
     
     class Config:
         env_file = ".env"

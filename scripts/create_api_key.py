@@ -42,7 +42,9 @@ async def create_api_key(
         expires_at = datetime.utcnow() + timedelta(days=expires_days)
     
     # Get database session
-    async for db in get_db():
+    from app.database.connection import SessionLocal
+    db = SessionLocal()
+    try:
         try:
             # Create the API key
             api_key, db_key = await APIKeyManager.create_api_key(
@@ -67,11 +69,11 @@ async def create_api_key(
             print("⚠️  IMPORTANT: Save this API key securely. It cannot be retrieved again!")
             print(f"   Use it in requests with the header: x-api-key: {api_key}")
             
-            break
-            
         except Exception as e:
             print(f"❌ Error creating API key: {e}")
             sys.exit(1)
+    finally:
+        db.close()
 
 
 async def list_api_keys() -> None:

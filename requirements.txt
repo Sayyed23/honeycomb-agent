@@ -23,7 +23,9 @@ google-generativeai==0.3.2
 
 # Security and authentication
 python-jose[cryptography]==3.5.0
-passlib[bcrypt]==1.7.4python-multipart==0.0.6
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+cryptography==41.0.8
 
 # Monitoring and logging
 prometheus-client==0.19.0

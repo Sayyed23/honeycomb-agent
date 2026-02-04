@@ -97,8 +97,22 @@ class ContextLogger:
     
     def _log(self, level: int, message: str, **kwargs):
         """Log message with context."""
+        # Extract standard logging arguments
+        exc_info = kwargs.pop('exc_info', None)
+        stack_info = kwargs.pop('stack_info', None)
+        stacklevel = kwargs.pop('stacklevel', 1)
+        
+        # Everything else goes into extra
         extra = {**self.context, **kwargs}
-        self.logger.log(level, message, extra=extra)
+        
+        self.logger.log(
+            level, 
+            message, 
+            exc_info=exc_info, 
+            stack_info=stack_info, 
+            stacklevel=stacklevel, 
+            extra=extra
+        )
     
     def debug(self, message: str, **kwargs):
         """Log debug message."""

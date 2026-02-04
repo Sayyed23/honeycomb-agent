@@ -831,6 +831,74 @@ class AuditLogger:
         self._log_audit_event(audit_event)
         return event_id
     
+    def log_threat_intelligence(
+        self,
+        session_id: str,
+        analysis_type: str,
+        threat_score: float,
+        methodology: str,
+        tactics_detected: List[str],
+        key_indicators: List[str],
+        analysis_summary: str,
+        processing_time_ms: Optional[int] = None,
+        correlation_id: Optional[str] = None
+    ) -> str:
+        """
+        Log a threat intelligence analysis audit event.
+        
+        Args:
+            session_id: Session identifier
+            analysis_type: Type of threat intelligence analysis
+            threat_score: Overall threat score (0.0-1.0)
+            methodology: Detected scammer methodology
+            tactics_detected: List of detected scammer tactics
+            key_indicators: Key indicators found in analysis
+            analysis_summary: Summary of the analysis
+            processing_time_ms: Processing time in milliseconds
+            correlation_id: Correlation ID for request tracking
+            
+        Returns:
+            str: Event ID for the logged audit event
+        """
+        # Create audit data
+        audit_data = {
+            "session_id": session_id,
+            "analysis_type": analysis_type,
+            "threat_score": threat_score,
+            "methodology": methodology,
+            "tactics_detected": tactics_detected,
+            "key_indicators": key_indicators,
+            "analysis_summary": analysis_summary,
+            "tactics_count": len(tactics_detected),
+            "indicators_count": len(key_indicators)
+        }
+        
+        # Determine severity based on threat score
+        if threat_score >= 0.8:
+            severity = AuditSeverity.CRITICAL
+        elif threat_score >= 0.6:
+            severity = AuditSeverity.HIGH
+        elif threat_score >= 0.4:
+            severity = AuditSeverity.MEDIUM
+        else:
+            severity = AuditSeverity.LOW
+        
+        # Create and log audit event
+        event_id = str(uuid.uuid4())
+        audit_event = AuditEvent(
+            event_id=event_id,
+            event_type=AuditEventType.CONVERSATION_ANALYSIS,  # Reusing existing type
+            severity=severity,
+            timestamp=datetime.utcnow(),
+            session_id=session_id,
+            event_data=audit_data,
+            correlation_id=correlation_id,
+            processing_time_ms=processing_time_ms
+        )
+        
+        self._log_audit_event(audit_event)
+        return event_id
+    
     def _generate_risk_assessment_rationale(
         self,
         risk_score: float,

@@ -13,11 +13,12 @@ from datetime import datetime
 from typing import Dict, Any
 
 from config.settings import settings
-from app.api.routes import health, honeypot
+from app.api.routes import health, honeypot, guvi_callback
 from app.core.logging import setup_logging, get_logger
 from app.core.metrics import setup_metrics, REQUEST_COUNT, REQUEST_DURATION
 from app.core.redis import redis_manager
 from app.core.session_manager import session_manager
+from app.services import callback_manager
 
 # Setup logging
 setup_logging()
@@ -128,6 +129,23 @@ async def add_request_logging_and_metrics(request: Request, call_next):
     # Add correlation ID to response headers
     response.headers["X-Correlation-ID"] = correlation_id
     
+    # Add correlation ID to response headers
+    response.headers["X-Correlation-ID"] = correlation_id
+    
+    return response
+
+
+@app.middleware("http")
+async def log_request_body(request: Request, call_next):
+    """Log request body for debugging."""
+    if request.url.path == "/api/honeypot" and request.method == "POST":
+        try:
+            body = await request.body()
+            logger.info(f"Incoming Request Body: {body.decode()}")
+        except Exception as e:
+            logger.error(f"Failed to log body: {e}")
+            
+    response = await call_next(request)
     return response
 
 
@@ -165,6 +183,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Include routers
 app.include_router(health.router, tags=["Health"])
 app.include_router(honeypot.router, prefix="/api", tags=["Honeypot"])
+app.include_router(guvi_callback.router, tags=["GUVI Callbacks"])
 
 
 @app.on_event("startup")
@@ -194,6 +213,13 @@ async def startup_event():
         logger.info("Session cleanup task started")
     except Exception as e:
         logger.error(f"Failed to start session cleanup task: {e}")
+    
+    # Start callback manager background tasks
+    try:
+        await callback_manager.start_background_tasks()
+        logger.info("Callback manager background tasks started")
+    except Exception as e:
+        logger.error(f"Failed to start callback manager: {e}")
 
 
 @app.on_event("shutdown")
@@ -207,6 +233,13 @@ async def shutdown_event():
         logger.info("Session cleanup task stopped")
     except Exception as e:
         logger.error(f"Error stopping session cleanup task: {e}")
+    
+    # Stop callback manager background tasks
+    try:
+        await callback_manager.stop_background_tasks()
+        logger.info("Callback manager background tasks stopped")
+    except Exception as e:
+        logger.error(f"Error stopping callback manager: {e}")
     
     # Close Redis connection
     try:

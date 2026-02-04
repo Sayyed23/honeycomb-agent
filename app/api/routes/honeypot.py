@@ -89,7 +89,7 @@ class MessageMetadata(BaseModel):
 
 class HoneypotRequest(BaseModel):
     """Request model for the honeypot API endpoint."""
-    sessionId: str = Field(..., min_length=1, max_length=100, description="Unique session identifier")
+    sessionId: str = Field(default_factory=lambda: str(uuid.uuid4()), min_length=1, max_length=100, description="Unique session identifier")
     message: str = Field(..., min_length=1, max_length=5000, description="Message content to analyze")
     conversationHistory: List[ConversationMessage] = Field(
         default_factory=list,
@@ -101,7 +101,9 @@ class HoneypotRequest(BaseModel):
     @field_validator("sessionId")
     @classmethod
     def validate_session_id(cls, v):
-        return InputSanitizer.sanitize_session_id(v)
+        if v:
+            return InputSanitizer.sanitize_session_id(v)
+        return v
     
     @field_validator("message")
     @classmethod
