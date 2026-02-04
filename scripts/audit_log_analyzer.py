@@ -164,8 +164,10 @@ def search_command(args):
                 rationale = entry.event_data.get("decision_rationale", "")
                 print(f"Risk Score: {risk_score}")
                 print(f"Confidence: {confidence}")
-                print(f"Rationale: {rationale[:200]}...")
-            
+                if len(rationale) > 200:
+                    print(f"Rationale: {rationale[:200]}...")
+                else:
+                    print(f"Rationale: {rationale}")            
             print("-" * 100)
 
 

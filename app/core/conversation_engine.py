@@ -1,22 +1,25 @@
 """
-Conversation engine for persona-based response generation and consistency tracking.
+Multi-turn conversation engine with LLM integration for intelligent scammer engagement.
 
-This module implements the conversation management system that generates
-persona-consistent responses and tracks conversation state across multiple turns.
+This module implements advanced conversation management with Google Gemini LLM,
+context window optimization, turn limits, and natural conversation conclusion strategies.
 """
 
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 import random
+import asyncio
 
 from app.core.logging import get_logger
 from app.core.persona_manager import persona_manager, PersonaType, PersonaProfile
 from app.core.session_manager import session_manager
 from app.core.audit_logger import audit_logger
+from app.core.llm_client import llm_client, LLMRequest, LLMResponse
+from app.core.safety_compliance import safety_compliance_engine, SafetyAction
 
 logger = get_logger(__name__)
 
@@ -39,6 +42,38 @@ class ConversationContext:
 
 
 @dataclass
+class ConversationState:
+    """State tracking for multi-turn conversations."""
+    session_id: str
+    total_turns: int
+    engagement_start_time: datetime
+    last_activity_time: datetime
+    conversation_phase: str  # 'opening', 'information_gathering', 'verification', 'conclusion'
+    information_extracted: Dict[str, Any] = field(default_factory=dict)
+    conversation_summary: str = ""
+    engagement_quality_score: float = 0.0
+    should_conclude: bool = False
+    conclusion_reason: Optional[str] = None
+    context_window_tokens: int = 0
+    
+    def get_engagement_duration(self) -> int:
+        """Get engagement duration in seconds."""
+        return int((self.last_activity_time - self.engagement_start_time).total_seconds())
+    
+    def is_within_turn_limits(self) -> bool:
+        """Check if conversation is within turn limits (5-10 turns)."""
+        return 5 <= self.total_turns <= 10
+    
+    def should_start_conclusion(self) -> bool:
+        """Determine if conversation should start concluding."""
+        return (
+            self.total_turns >= 8 or  # Approaching turn limit
+            self.get_engagement_duration() >= 120 or  # 2 minutes engagement
+            self.engagement_quality_score < 0.3  # Low quality engagement
+        )
+
+
+@dataclass
 class ResponseGenerationResult:
     """Result of response generation process."""
     response_content: str
@@ -47,17 +82,929 @@ class ResponseGenerationResult:
     generation_method: str
     confidence: float
     processing_time_ms: int
+    conversation_state: Optional[ConversationState] = None
+    llm_metadata: Optional[Dict[str, Any]] = None
 
 
 class ConversationEngine:
     """
-    Persona-based conversation engine for intelligent scammer engagement.
+    Multi-turn conversation engine with LLM integration for intelligent scammer engagement.
     
-    Generates contextually appropriate responses that maintain persona consistency
-    across conversation turns while gathering intelligence from scammers.
+    Provides advanced conversation management with context window optimization,
+    turn limits, natural conclusion strategies, and seamless LLM integration.
     """
     
-    # Response templates by persona and context
+    # Conversation phase definitions
+    CONVERSATION_PHASES = {
+        'opening': {
+            'description': 'Initial engagement and rapport building',
+            'turn_range': (1, 2),
+            'objectives': ['establish_persona', 'build_rapport', 'show_interest']
+        },
+        'information_gathering': {
+            'description': 'Active intelligence extraction',
+            'turn_range': (3, 6),
+            'objectives': ['extract_entities', 'understand_tactics', 'maintain_engagement']
+        },
+        'verification': {
+            'description': 'Verify and clarify extracted information',
+            'turn_range': (7, 8),
+            'objectives': ['confirm_details', 'probe_deeper', 'assess_threat']
+        },
+        'conclusion': {
+            'description': 'Natural conversation ending',
+            'turn_range': (9, 10),
+            'objectives': ['graceful_exit', 'final_intelligence', 'avoid_suspicion']
+        }
+    }
+    
+    # Context window management settings
+    CONTEXT_WINDOW_CONFIG = {
+        'max_tokens': 8000,  # Maximum tokens for Gemini context
+        'recent_messages_count': 5,  # Always include last N messages
+        'summary_threshold': 10,  # Summarize if more than N messages
+        'token_estimation_factor': 1.3  # Rough token estimation multiplier
+    }
+    
+    # Natural conclusion strategies
+    CONCLUSION_STRATEGIES = {
+        PersonaType.DIGITALLY_NAIVE: [
+            "I need to think about this more. Let me talk to my family first.",
+            "This is getting complicated for me. I should probably get help from someone who understands technology better.",
+            "I'm getting confused with all this information. Maybe I should handle this later when I'm less tired.",
+            "I think I need to be more careful. Let me research this properly before doing anything."
+        ],
+        PersonaType.AVERAGE_USER: [
+            "I appreciate the information, but I want to verify this through official channels first.",
+            "Let me take some time to consider this properly. I don't like to rush important decisions.",
+            "I think I should consult with my bank/advisor before proceeding with anything like this.",
+            "Thanks for the details. I'll need to do my own research before moving forward."
+        ],
+        PersonaType.SKEPTICAL: [
+            "I'm not convinced this is legitimate. I'm going to report this to the authorities.",
+            "This conversation has confirmed my suspicions. I won't be participating in this.",
+            "I've heard enough. This is clearly not a legitimate operation.",
+            "I'm ending this conversation. I suggest you find more honest work."
+        ]
+    }
+    
+    def __init__(self):
+        """Initialize the conversation engine."""
+        self.conversation_states = {}  # session_id -> ConversationState
+        self.response_cache = {}  # Cache for similar responses
+        self.conversation_patterns = {}  # Track conversation patterns
+        self._llm_initialized = False
+    
+    async def _ensure_llm_initialized(self):
+        """Ensure LLM client is initialized."""
+        if not self._llm_initialized:
+            try:
+                if not llm_client.is_initialized:
+                    await llm_client.initialize()
+                self._llm_initialized = True
+            except Exception as e:
+                logger.error(f"Failed to initialize LLM client: {e}")
+                self._llm_initialized = False
+    
+    async def generate_response(
+        self,
+        session_id: str,
+        message_content: str,
+        conversation_history: List[Dict[str, Any]] = None,
+        metadata: Dict[str, Any] = None
+    ) -> ResponseGenerationResult:
+        """
+        Generate a persona-consistent response with multi-turn conversation management.
+        
+        Args:
+            session_id: Session identifier
+            message_content: Current message content
+            conversation_history: Previous conversation messages
+            metadata: Additional context metadata
+            
+        Returns:
+            ResponseGenerationResult: Generated response with conversation state
+        """
+        start_time = time.time()
+        
+        if conversation_history is None:
+            conversation_history = []
+        if metadata is None:
+            metadata = {}
+        
+        try:
+            # Ensure LLM is initialized
+            await self._ensure_llm_initialized()
+            
+            # Get or create conversation state
+            conversation_state = await self._get_or_create_conversation_state(
+                session_id, conversation_history
+            )
+            
+            # Update conversation state
+            conversation_state.total_turns = len(conversation_history) + 1
+            conversation_state.last_activity_time = datetime.utcnow()
+            
+            # Get session state and persona
+            session_state = await session_manager.get_session(session_id)
+            if not session_state or not session_state.metrics.persona_type:
+                logger.warning(f"No persona found for session {session_id}")
+                return self._generate_fallback_response(message_content, metadata.get('language', 'en'))
+            
+            persona = PersonaType(session_state.metrics.persona_type)
+            
+            # Create conversation context
+            context = ConversationContext(
+                session_id=session_id,
+                persona=persona,
+                message_content=message_content,
+                conversation_history=conversation_history,
+                risk_score=session_state.metrics.risk_score,
+                turn_number=conversation_state.total_turns,
+                language=metadata.get('language', 'en'),
+                metadata=metadata
+            )
+            
+            # Update conversation phase
+            conversation_state.conversation_phase = self._determine_conversation_phase(conversation_state)
+            
+            # Check if conversation should conclude due to safety triggers
+            should_terminate, termination_message = safety_compliance_engine.should_terminate_conversation(
+                session_id, message_content, conversation_history
+            )
+            
+            if should_terminate:
+                return await self._generate_safety_termination_response(
+                    context, conversation_state, termination_message
+                )
+            
+            # Check if conversation should conclude due to other factors
+            if self._should_conclude_conversation(conversation_state, context):
+                return await self._generate_conclusion_response(context, conversation_state)
+            
+            # Generate response using LLM with context optimization
+            response_content, llm_metadata = await self._generate_llm_response_with_context_management(
+                context, conversation_state
+            )
+            
+            # Apply safety filtering to the generated response
+            filtered_response, was_modified = safety_compliance_engine.filter_response_content(
+                response_content,
+                context.session_id,
+                context.persona
+            )
+            
+            # Use filtered response
+            response_content = filtered_response
+            
+            # Update LLM metadata if response was modified
+            if was_modified and llm_metadata:
+                llm_metadata['safety_filtered'] = True
+                llm_metadata['content_modified'] = True
+            
+            # Track persona consistency
+            consistency_score = await persona_manager.track_response_consistency(
+                session_id, response_content, persona
+            )
+            
+            # Update conversation state with response
+            await self._update_conversation_state_with_response(
+                conversation_state, response_content, consistency_score
+            )
+            
+            # Analyze response characteristics
+            characteristics = self._analyze_response_characteristics(response_content, persona)
+            
+            # Calculate processing time
+            processing_time_ms = int((time.time() - start_time) * 1000)
+            
+            # Create result
+            result = ResponseGenerationResult(
+                response_content=response_content,
+                persona_consistency_score=consistency_score,
+                response_characteristics=characteristics,
+                generation_method="llm_multi_turn",
+                confidence=consistency_score,
+                processing_time_ms=processing_time_ms,
+                conversation_state=conversation_state,
+                llm_metadata=llm_metadata
+            )
+            
+            # Store updated conversation state
+            self.conversation_states[session_id] = conversation_state
+            
+            # Log conversation event
+            audit_logger.log_conversation_response(
+                session_id=session_id,
+                persona=persona.value,
+                response_content=response_content,
+                consistency_score=consistency_score,
+                characteristics=characteristics,
+                processing_time_ms=processing_time_ms,
+                correlation_id=metadata.get('correlation_id')
+            )
+            
+            logger.info(
+                f"Generated multi-turn LLM response",
+                extra={
+                    "session_id": session_id,
+                    "persona": persona.value,
+                    "turn_number": conversation_state.total_turns,
+                    "phase": conversation_state.conversation_phase,
+                    "consistency_score": consistency_score,
+                    "processing_time_ms": processing_time_ms
+                }
+            )
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error generating multi-turn response: {e}", exc_info=True)
+            
+            # Log error
+            audit_logger.log_system_error(
+                error_type="multi_turn_response_generation_error",
+                error_message=f"Error generating multi-turn response: {e}",
+                error_details={
+                    "session_id": session_id,
+                    "message_length": len(message_content),
+                    "conversation_turns": len(conversation_history)
+                },
+                session_id=session_id,
+                correlation_id=metadata.get('correlation_id')
+            )
+            
+            # Return fallback response
+            return self._generate_fallback_response(message_content, metadata.get('language', 'en'))
+    
+    async def _get_or_create_conversation_state(
+        self,
+        session_id: str,
+        conversation_history: List[Dict[str, Any]]
+    ) -> ConversationState:
+        """
+        Get existing conversation state or create new one.
+        
+        Args:
+            session_id: Session identifier
+            conversation_history: Conversation history
+            
+        Returns:
+            ConversationState: Conversation state
+        """
+        if session_id in self.conversation_states:
+            return self.conversation_states[session_id]
+        
+        # Create new conversation state
+        now = datetime.utcnow()
+        state = ConversationState(
+            session_id=session_id,
+            total_turns=len(conversation_history),
+            engagement_start_time=now,
+            last_activity_time=now,
+            conversation_phase='opening'
+        )
+        
+        self.conversation_states[session_id] = state
+        return state
+    
+    def _determine_conversation_phase(self, conversation_state: ConversationState) -> str:
+        """
+        Determine current conversation phase based on turn count and state.
+        
+        Args:
+            conversation_state: Current conversation state
+            
+        Returns:
+            str: Conversation phase
+        """
+        turn_number = conversation_state.total_turns
+        
+        # Check if should conclude
+        if conversation_state.should_conclude or turn_number >= 9:
+            return 'conclusion'
+        
+        # Determine phase based on turn number
+        for phase, config in self.CONVERSATION_PHASES.items():
+            turn_range = config['turn_range']
+            if turn_range[0] <= turn_number <= turn_range[1]:
+                return phase
+        
+        # Default to information gathering if beyond defined ranges
+        if turn_number <= 8:
+            return 'information_gathering'
+        else:
+            return 'conclusion'
+    
+    def _should_conclude_conversation(
+        self,
+        conversation_state: ConversationState,
+        context: ConversationContext
+    ) -> bool:
+        """
+        Determine if conversation should be concluded.
+        
+        Args:
+            conversation_state: Current conversation state
+            context: Conversation context
+            
+        Returns:
+            bool: True if conversation should conclude
+        """
+        # Check explicit conclusion flag
+        if conversation_state.should_conclude:
+            return True
+        
+        # Check turn limits (5-10 turns)
+        if conversation_state.total_turns >= 10:
+            conversation_state.conclusion_reason = "turn_limit_reached"
+            return True
+        
+        # Check engagement duration (max 2 minutes)
+        if conversation_state.get_engagement_duration() >= 120:
+            conversation_state.conclusion_reason = "time_limit_reached"
+            return True
+        
+        # Check engagement quality
+        if (conversation_state.total_turns >= 5 and 
+            conversation_state.engagement_quality_score < 0.3):
+            conversation_state.conclusion_reason = "low_engagement_quality"
+            return True
+        
+        # Check for safety triggers in message
+        message_lower = context.message_content.lower()
+        safety_triggers = [
+            'police', 'report', 'authorities', 'scam', 'fraud', 'illegal',
+            'suspicious', 'fake', 'lie', 'lying', 'cheat', 'cheating'
+        ]
+        
+        if any(trigger in message_lower for trigger in safety_triggers):
+            conversation_state.conclusion_reason = "safety_trigger_detected"
+            return True
+        
+        # Natural conclusion for skeptical persona after sufficient turns
+        if (context.persona == PersonaType.SKEPTICAL and 
+            conversation_state.total_turns >= 6):
+            conversation_state.conclusion_reason = "skeptical_persona_natural_end"
+            return True
+        
+        return False
+    
+    async def _generate_safety_termination_response(
+        self,
+        context: ConversationContext,
+        conversation_state: ConversationState,
+        termination_message: str
+    ) -> ResponseGenerationResult:
+        """
+        Generate a safety-triggered termination response.
+        
+        Args:
+            context: Conversation context
+            conversation_state: Conversation state
+            termination_message: Pre-generated termination message
+            
+        Returns:
+            ResponseGenerationResult: Safety termination response
+        """
+        start_time = time.time()
+        
+        try:
+            # Mark conversation as terminated due to safety
+            conversation_state.should_conclude = True
+            conversation_state.conclusion_reason = "safety_termination"
+            conversation_state.conversation_phase = 'conclusion'
+            
+            # Use the provided termination message
+            response_content = termination_message
+            
+            # Track persona consistency (lower score for safety termination)
+            consistency_score = 0.8  # Still consistent but safety-driven
+            
+            # Update conversation state
+            conversation_state.engagement_quality_score = consistency_score
+            
+            # Analyze response characteristics
+            characteristics = self._analyze_response_characteristics(response_content, context.persona)
+            characteristics['safety_termination'] = True
+            characteristics['conclusion'] = True
+            characteristics['conclusion_reason'] = 'safety_termination'
+            
+            # Calculate processing time
+            processing_time_ms = int((time.time() - start_time) * 1000)
+            
+            logger.warning(
+                f"Generated safety termination response",
+                extra={
+                    "session_id": context.session_id,
+                    "persona": context.persona.value,
+                    "conclusion_reason": conversation_state.conclusion_reason,
+                    "processing_time_ms": processing_time_ms
+                }
+            )
+            
+            return ResponseGenerationResult(
+                response_content=response_content,
+                persona_consistency_score=consistency_score,
+                response_characteristics=characteristics,
+                generation_method="safety_termination",
+                confidence=1.0,  # High confidence in safety decision
+                processing_time_ms=processing_time_ms,
+                conversation_state=conversation_state,
+                llm_metadata=None
+            )
+            
+        except Exception as e:
+            logger.error(f"Error generating safety termination response: {e}", exc_info=True)
+            
+            # Fallback to simple termination
+            response_content = "I need to go now. Take care!"
+            processing_time_ms = int((time.time() - start_time) * 1000)
+            
+            return ResponseGenerationResult(
+                response_content=response_content,
+                persona_consistency_score=0.5,
+                response_characteristics={'safety_termination': True, 'fallback': True},
+                generation_method="fallback_safety_termination",
+                confidence=0.5,
+                processing_time_ms=processing_time_ms,
+                conversation_state=conversation_state
+            )
+    
+    async def _generate_conclusion_response(
+        self,
+        context: ConversationContext,
+        conversation_state: ConversationState
+    ) -> ResponseGenerationResult:
+        """
+        Generate a natural conclusion response.
+        
+        Args:
+            context: Conversation context
+            conversation_state: Conversation state
+            
+        Returns:
+            ResponseGenerationResult: Conclusion response
+        """
+        start_time = time.time()
+        
+        try:
+            # Mark conversation as concluding
+            conversation_state.should_conclude = True
+            conversation_state.conversation_phase = 'conclusion'
+            
+            # Try LLM-generated conclusion first
+            conclusion_prompt = self._build_conclusion_prompt(context, conversation_state)
+            
+            llm_request = LLMRequest(
+                session_id=context.session_id,
+                persona=context.persona,
+                message_content=conclusion_prompt,
+                conversation_history=context.conversation_history,
+                context_metadata={
+                    **context.metadata,
+                    'conversation_phase': 'conclusion',
+                    'conclusion_reason': conversation_state.conclusion_reason
+                },
+                language=context.language,
+                max_tokens=300,  # Shorter for conclusions
+                temperature=0.6   # Slightly less creative for conclusions
+            )
+            
+            llm_response = await llm_client.generate_response(llm_request)
+            
+            if not llm_response.fallback_used and llm_response.confidence_score > 0.6:
+                response_content = llm_response.generated_content
+                generation_method = "llm_conclusion"
+                llm_metadata = {
+                    'model_used': llm_response.model_used,
+                    'confidence_score': llm_response.confidence_score,
+                    'safety_filtered': llm_response.safety_filtered,
+                    'processing_time_ms': llm_response.processing_time_ms
+                }
+            else:
+                # Fallback to template-based conclusion
+                response_content = self._generate_template_conclusion(context)
+                generation_method = "template_conclusion"
+                llm_metadata = None
+            
+            # Track persona consistency
+            consistency_score = await persona_manager.track_response_consistency(
+                context.session_id, response_content, context.persona
+            )
+            
+            # Update conversation state
+            conversation_state.engagement_quality_score = consistency_score
+            
+            # Analyze response characteristics
+            characteristics = self._analyze_response_characteristics(response_content, context.persona)
+            characteristics['conclusion'] = True
+            characteristics['conclusion_reason'] = conversation_state.conclusion_reason
+            
+            # Calculate processing time
+            processing_time_ms = int((time.time() - start_time) * 1000)
+            
+            logger.info(
+                f"Generated conclusion response",
+                extra={
+                    "session_id": context.session_id,
+                    "persona": context.persona.value,
+                    "conclusion_reason": conversation_state.conclusion_reason,
+                    "generation_method": generation_method,
+                    "processing_time_ms": processing_time_ms
+                }
+            )
+            
+            return ResponseGenerationResult(
+                response_content=response_content,
+                persona_consistency_score=consistency_score,
+                response_characteristics=characteristics,
+                generation_method=generation_method,
+                confidence=consistency_score,
+                processing_time_ms=processing_time_ms,
+                conversation_state=conversation_state,
+                llm_metadata=llm_metadata
+            )
+            
+        except Exception as e:
+            logger.error(f"Error generating conclusion response: {e}", exc_info=True)
+            
+            # Fallback to simple template conclusion
+            response_content = self._generate_template_conclusion(context)
+            processing_time_ms = int((time.time() - start_time) * 1000)
+            
+            return ResponseGenerationResult(
+                response_content=response_content,
+                persona_consistency_score=0.5,
+                response_characteristics={'conclusion': True, 'fallback': True},
+                generation_method="fallback_conclusion",
+                confidence=0.5,
+                processing_time_ms=processing_time_ms,
+                conversation_state=conversation_state
+            )
+    
+    def _build_conclusion_prompt(
+        self,
+        context: ConversationContext,
+        conversation_state: ConversationState
+    ) -> str:
+        """
+        Build a prompt for LLM to generate natural conclusion.
+        
+        Args:
+            context: Conversation context
+            conversation_state: Conversation state
+            
+        Returns:
+            str: Conclusion prompt
+        """
+        reason = conversation_state.conclusion_reason or "natural_end"
+        
+        conclusion_instructions = {
+            "turn_limit_reached": "You've been talking for a while and need to end the conversation naturally.",
+            "time_limit_reached": "You've been engaged for some time and should wrap up the conversation.",
+            "low_engagement_quality": "The conversation isn't going well and you want to politely end it.",
+            "safety_trigger_detected": "Something seems suspicious and you want to be cautious.",
+            "skeptical_persona_natural_end": "You've gathered enough information to be suspicious.",
+            "natural_end": "It's time to naturally conclude this conversation."
+        }
+        
+        instruction = conclusion_instructions.get(reason, conclusion_instructions["natural_end"])
+        
+        return f"CONCLUSION INSTRUCTION: {instruction} Respond naturally as your persona would to end this conversation gracefully. Current message: {context.message_content}"
+    
+    def _generate_template_conclusion(self, context: ConversationContext) -> str:
+        """
+        Generate template-based conclusion response.
+        
+        Args:
+            context: Conversation context
+            
+        Returns:
+            str: Conclusion response
+        """
+        strategies = self.CONCLUSION_STRATEGIES.get(
+            context.persona, 
+            self.CONCLUSION_STRATEGIES[PersonaType.AVERAGE_USER]
+        )
+        
+        return random.choice(strategies)
+    
+    async def _generate_llm_response_with_context_management(
+        self,
+        context: ConversationContext,
+        conversation_state: ConversationState
+    ) -> Tuple[str, Optional[Dict[str, Any]]]:
+        """
+        Generate LLM response with optimized context window management.
+        
+        Args:
+            context: Conversation context
+            conversation_state: Conversation state
+            
+        Returns:
+            Tuple[str, Optional[Dict]]: (response_content, llm_metadata)
+        """
+        try:
+            # Optimize conversation history for context window
+            optimized_history = self._optimize_context_window(
+                context.conversation_history,
+                conversation_state
+            )
+            
+            # Update context window token count
+            conversation_state.context_window_tokens = self._estimate_token_count(optimized_history)
+            
+            # Build enhanced context metadata
+            enhanced_metadata = {
+                **context.metadata,
+                'conversation_phase': conversation_state.conversation_phase,
+                'turn_number': conversation_state.total_turns,
+                'engagement_duration': conversation_state.get_engagement_duration(),
+                'phase_objectives': self.CONVERSATION_PHASES[conversation_state.conversation_phase]['objectives']
+            }
+            
+            # Create LLM request with optimized context
+            llm_request = LLMRequest(
+                session_id=context.session_id,
+                persona=context.persona,
+                message_content=context.message_content,
+                conversation_history=optimized_history,
+                context_metadata=enhanced_metadata,
+                language=context.language,
+                max_tokens=500,
+                temperature=0.7
+            )
+            
+            # Generate response
+            llm_response = await llm_client.generate_response(llm_request)
+            
+            if not llm_response.fallback_used and llm_response.confidence_score > 0.5:
+                logger.debug(
+                    f"LLM response generated successfully",
+                    extra={
+                        "session_id": context.session_id,
+                        "confidence": llm_response.confidence_score,
+                        "context_tokens": conversation_state.context_window_tokens,
+                        "processing_time_ms": llm_response.processing_time_ms
+                    }
+                )
+                
+                return llm_response.generated_content, {
+                    'model_used': llm_response.model_used,
+                    'confidence_score': llm_response.confidence_score,
+                    'safety_filtered': llm_response.safety_filtered,
+                    'processing_time_ms': llm_response.processing_time_ms,
+                    'context_tokens': conversation_state.context_window_tokens
+                }
+            else:
+                logger.warning(
+                    f"LLM response quality insufficient, falling back to templates",
+                    extra={
+                        "session_id": context.session_id,
+                        "fallback_used": llm_response.fallback_used,
+                        "confidence": llm_response.confidence_score
+                    }
+                )
+                
+                # Fallback to template-based generation
+                template_response = self._generate_template_based_response(context)
+                return template_response, None
+                
+        except Exception as e:
+            logger.error(f"Error in LLM response generation: {e}", exc_info=True)
+            
+            # Fallback to template-based generation
+            template_response = self._generate_template_based_response(context)
+            return template_response, None
+    
+    def _optimize_context_window(
+        self,
+        conversation_history: List[Dict[str, Any]],
+        conversation_state: ConversationState
+    ) -> List[Dict[str, Any]]:
+        """
+        Optimize conversation history for context window constraints.
+        
+        Args:
+            conversation_history: Full conversation history
+            conversation_state: Current conversation state
+            
+        Returns:
+            List[Dict[str, Any]]: Optimized conversation history
+        """
+        config = self.CONTEXT_WINDOW_CONFIG
+        
+        # If conversation is short, return as-is
+        if len(conversation_history) <= config['recent_messages_count']:
+            return conversation_history
+        
+        # Always include recent messages
+        recent_messages = conversation_history[-config['recent_messages_count']:]
+        
+        # If total messages exceed summary threshold, create summary
+        if len(conversation_history) > config['summary_threshold']:
+            # Create summary of older messages
+            older_messages = conversation_history[:-config['recent_messages_count']]
+            summary = self._create_conversation_summary(older_messages, conversation_state)
+            
+            # Create summary message
+            summary_message = {
+                'role': 'system',
+                'content': f"[Conversation Summary: {summary}]",
+                'timestamp': conversation_state.engagement_start_time.isoformat()
+            }
+            
+            return [summary_message] + recent_messages
+        else:
+            # Include more messages if within token limits
+            estimated_tokens = self._estimate_token_count(conversation_history)
+            
+            if estimated_tokens <= config['max_tokens']:
+                return conversation_history
+            else:
+                # Gradually reduce history until within limits
+                for i in range(len(conversation_history) - config['recent_messages_count']):
+                    subset = conversation_history[i:] 
+                    if self._estimate_token_count(subset) <= config['max_tokens']:
+                        return subset
+                
+                # If still too large, return only recent messages
+                return recent_messages
+    
+    def _estimate_token_count(self, messages: List[Dict[str, Any]]) -> int:
+        """
+        Estimate token count for messages.
+        
+        Args:
+            messages: List of messages
+            
+        Returns:
+            int: Estimated token count
+        """
+        total_chars = sum(len(msg.get('content', '')) for msg in messages)
+        # Rough estimation: 1 token ≈ 4 characters, with safety factor
+        return int(total_chars / 4 * self.CONTEXT_WINDOW_CONFIG['token_estimation_factor'])
+    
+    def _create_conversation_summary(
+        self,
+        messages: List[Dict[str, Any]],
+        conversation_state: ConversationState
+    ) -> str:
+        """
+        Create a summary of conversation messages.
+        
+        Args:
+            messages: Messages to summarize
+            conversation_state: Current conversation state
+            
+        Returns:
+            str: Conversation summary
+        """
+        if not messages:
+            return "No previous conversation."
+        
+        # Extract key information
+        user_messages = [msg for msg in messages if msg.get('role') == 'user']
+        assistant_messages = [msg for msg in messages if msg.get('role') == 'assistant']
+        
+        # Identify key topics
+        all_content = ' '.join(msg.get('content', '') for msg in messages)
+        
+        # Extract entities and topics
+        financial_terms = re.findall(
+            r'\b(?:upi|payment|transfer|bank|account|money|rupees|amount)\b',
+            all_content.lower()
+        )
+        
+        technical_terms = re.findall(
+            r'\b(?:otp|pin|cvv|app|software|link|website|download)\b',
+            all_content.lower()
+        )
+        
+        urgency_terms = re.findall(
+            r'\b(?:urgent|immediate|quickly|emergency|asap)\b',
+            all_content.lower()
+        )
+        
+        # Build summary
+        summary_parts = [
+            f"Previous conversation with {len(user_messages)} user messages and {len(assistant_messages)} responses."
+        ]
+        
+        if financial_terms:
+            summary_parts.append(f"Financial topics discussed: {', '.join(set(financial_terms[:3]))}.")
+        
+        if technical_terms:
+            summary_parts.append(f"Technical elements mentioned: {', '.join(set(technical_terms[:3]))}.")
+        
+        if urgency_terms:
+            summary_parts.append("Urgency indicators present in conversation.")
+        
+        # Add conversation state context
+        if conversation_state.information_extracted:
+            summary_parts.append(f"Information extracted: {len(conversation_state.information_extracted)} items.")
+        
+        return ' '.join(summary_parts)
+    
+    async def _update_conversation_state_with_response(
+        self,
+        conversation_state: ConversationState,
+        response_content: str,
+        consistency_score: float
+    ) -> None:
+        """
+        Update conversation state based on generated response.
+        
+        Args:
+            conversation_state: Conversation state to update
+            response_content: Generated response
+            consistency_score: Persona consistency score
+        """
+        # Update engagement quality score (running average)
+        if conversation_state.engagement_quality_score == 0.0:
+            conversation_state.engagement_quality_score = consistency_score
+        else:
+            # Weighted average favoring recent performance
+            conversation_state.engagement_quality_score = (
+                0.7 * conversation_state.engagement_quality_score + 
+                0.3 * consistency_score
+            )
+        
+        # Update conversation summary
+        conversation_state.conversation_summary = self._update_conversation_summary(
+            conversation_state.conversation_summary,
+            response_content,
+            conversation_state.total_turns
+        )
+        
+        # Extract any new information from the response
+        extracted_info = self._extract_information_from_response(response_content)
+        if extracted_info:
+            conversation_state.information_extracted.update(extracted_info)
+    
+    def _update_conversation_summary(
+        self,
+        current_summary: str,
+        new_response: str,
+        turn_number: int
+    ) -> str:
+        """
+        Update conversation summary with new response.
+        
+        Args:
+            current_summary: Current summary
+            new_response: New response content
+            turn_number: Current turn number
+            
+        Returns:
+            str: Updated summary
+        """
+        # For early turns, build detailed summary
+        if turn_number <= 3:
+            if not current_summary:
+                return f"Turn {turn_number}: {new_response[:100]}..."
+            else:
+                return f"{current_summary} Turn {turn_number}: {new_response[:100]}..."
+        
+        # For later turns, maintain high-level summary
+        key_topics = re.findall(
+            r'\b(?:payment|transfer|bank|account|upi|otp|help|problem|urgent|verify)\b',
+            new_response.lower()
+        )
+        
+        if key_topics:
+            topic_summary = f"Discussed: {', '.join(set(key_topics[:3]))}"
+            if current_summary:
+                return f"{current_summary[:200]}... {topic_summary}"
+            else:
+                return topic_summary
+        
+        return current_summary
+    
+    def _extract_information_from_response(self, response_content: str) -> Dict[str, Any]:
+        """
+        Extract information revealed in the response.
+        
+        Args:
+            response_content: Response content
+            
+        Returns:
+            Dict[str, Any]: Extracted information
+        """
+        extracted = {}
+        
+        # Extract any personal information mentioned
+        if re.search(r'\b(?:my|i have|i use)\b.*\b(?:account|bank|upi)\b', response_content.lower()):
+            extracted['personal_banking_reference'] = True
+        
+        if re.search(r'\b(?:family|son|daughter|husband|wife)\b', response_content.lower()):
+            extracted['family_reference'] = True
+        
+        if re.search(r'\b(?:confused|don\'t understand|help me)\b', response_content.lower()):
+            extracted['vulnerability_indicator'] = True
+        
+        return extracted
     RESPONSE_TEMPLATES = {
         PersonaType.DIGITALLY_NAIVE: {
             'greeting': [
@@ -171,125 +1118,36 @@ class ConversationEngine:
     
     def __init__(self):
         """Initialize the conversation engine."""
+        self.conversation_states = {}  # session_id -> ConversationState
         self.response_cache = {}  # Cache for similar responses
         self.conversation_patterns = {}  # Track conversation patterns
+        self._llm_initialized = False
     
-    async def generate_response(
-        self,
-        session_id: str,
-        message_content: str,
-        conversation_history: List[Dict[str, Any]] = None,
-        metadata: Dict[str, Any] = None
-    ) -> ResponseGenerationResult:
+    async def cleanup_session_data(self, session_id: str) -> None:
         """
-        Generate a persona-consistent response to the given message.
+        Clean up conversation data for completed session.
         
         Args:
             session_id: Session identifier
-            message_content: Current message content
-            conversation_history: Previous conversation messages
-            metadata: Additional context metadata
+        """
+        self.conversation_states.pop(session_id, None)
+        logger.debug(f"Cleaned up conversation data for session {session_id}")
+    
+    def get_conversation_state(self, session_id: str) -> Optional[ConversationState]:
+        """
+        Get conversation state for a session.
+        
+        Args:
+            session_id: Session identifier
             
         Returns:
-            ResponseGenerationResult: Generated response with metadata
+            Optional[ConversationState]: Conversation state or None
         """
-        start_time = time.time()
-        
-        if conversation_history is None:
-            conversation_history = []
-        if metadata is None:
-            metadata = {}
-        
-        try:
-            # Get session state and persona
-            session_state = await session_manager.get_session(session_id)
-            if not session_state or not session_state.metrics.persona_type:
-                logger.warning(f"No persona found for session {session_id}")
-                return self._generate_fallback_response(message_content, metadata.get('language', 'en'))
-            
-            persona = PersonaType(session_state.metrics.persona_type)
-            
-            # Create conversation context
-            context = ConversationContext(
-                session_id=session_id,
-                persona=persona,
-                message_content=message_content,
-                conversation_history=conversation_history,
-                risk_score=session_state.metrics.risk_score,
-                turn_number=len(conversation_history) + 1,
-                language=metadata.get('language', 'en'),
-                metadata=metadata
-            )
-            
-            # Generate response based on context and persona
-            response_content = await self._generate_persona_response(context)
-            
-            # Track persona consistency
-            consistency_score = await persona_manager.track_response_consistency(
-                session_id, response_content, persona
-            )
-            
-            # Analyze response characteristics
-            characteristics = self._analyze_response_characteristics(response_content, persona)
-            
-            # Calculate processing time
-            processing_time_ms = int((time.time() - start_time) * 1000)
-            
-            # Create result
-            result = ResponseGenerationResult(
-                response_content=response_content,
-                persona_consistency_score=consistency_score,
-                response_characteristics=characteristics,
-                generation_method="persona_based",
-                confidence=consistency_score,
-                processing_time_ms=processing_time_ms
-            )
-            
-            # Log conversation event
-            audit_logger.log_conversation_response(
-                session_id=session_id,
-                persona=persona.value,
-                response_content=response_content,
-                consistency_score=consistency_score,
-                characteristics=characteristics,
-                processing_time_ms=processing_time_ms,
-                correlation_id=metadata.get('correlation_id')
-            )
-            
-            logger.info(
-                f"Generated persona response",
-                extra={
-                    "session_id": session_id,
-                    "persona": persona.value,
-                    "consistency_score": consistency_score,
-                    "processing_time_ms": processing_time_ms
-                }
-            )
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error generating response: {e}", exc_info=True)
-            
-            # Log error
-            audit_logger.log_system_error(
-                error_type="response_generation_error",
-                error_message=f"Error generating response: {e}",
-                error_details={
-                    "session_id": session_id,
-                    "message_length": len(message_content),
-                    "conversation_turns": len(conversation_history)
-                },
-                session_id=session_id,
-                correlation_id=metadata.get('correlation_id')
-            )
-            
-            # Return fallback response
-            return self._generate_fallback_response(message_content, metadata.get('language', 'en'))
+        return self.conversation_states.get(session_id)
     
-    async def _generate_persona_response(self, context: ConversationContext) -> str:
+    def _generate_template_based_response(self, context: ConversationContext) -> str:
         """
-        Generate a response based on persona characteristics and context.
+        Generate response using template-based approach (fallback method).
         
         Args:
             context: Conversation context

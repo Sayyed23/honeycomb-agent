@@ -27,8 +27,7 @@ def hash_message(content: str, metadata: Optional[Dict[str, Any]] = None) -> str
     }
     
     # Sort keys for consistent hashing
-    hash_string = json.dumps(hash_data, sort_keys=True, ensure_ascii=True)
-    
+    hash_string = json.dumps(hash_data, sort_keys=True, ensure_ascii=True, default=str)    
     # Generate SHA-256 hash
     return hashlib.sha256(hash_string.encode('utf-8')).hexdigest()
 

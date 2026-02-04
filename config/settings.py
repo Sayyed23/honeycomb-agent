@@ -13,9 +13,10 @@ class DatabaseSettings(BaseSettings):
     """Database configuration settings."""
     
     url: str = Field(
-        default="postgresql://honeypot_user:password@localhost:5432/honeypot_api",
+        default="postgresql://test:test@localhost:5432/test",
         description="PostgreSQL database URL"
     )
+    
     echo: bool = Field(
         default=False,
         description="Enable SQLAlchemy query logging"

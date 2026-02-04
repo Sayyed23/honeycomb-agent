@@ -18,9 +18,6 @@ The API implements a comprehensive authentication system with the following feat
 ### API Key Format
 
 API keys are 32-character URL-safe strings generated using cryptographically secure random number generation:
-
-```
-Example: SHMOubjsRVIPiF9QuIXKURSOenqGP0IpFhTRKpFiT_k
 ```
 
 ### Key Storage
@@ -100,8 +97,8 @@ X-RateLimit-Reset: 1640995200
 Each API key has configurable rate limits:
 
 - **Default Limit**: 1000 requests per hour
-- **Sliding Window**: Rate limits reset every hour
-- **Per-Key Limits**: Individual limits per API key
+- **Fixed Window**: Rate limits reset at the top of each hour
+- **Per-Key Limits**: Individual limits per API key- **Per-Key Limits**: Individual limits per API key
 
 ### Rate Limit Headers
 

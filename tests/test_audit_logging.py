@@ -501,9 +501,9 @@ class TestAuditIntegration:
             with patch.object(engine, 'analyze_message', side_effect=Exception("Test error")):
                 risk_score, confidence = engine.calculate_risk_score(
                     message="Test message",
+                    conversation_history=[],
                     metadata={"session_id": "test-session"}
-                )
-                
+                )                
                 # Verify error audit logging was called
                 assert mock_audit.log_system_error.called
                 

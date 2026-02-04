@@ -70,8 +70,7 @@ class TestTextPreprocessor:
         
         result = self.preprocessor.preprocess(None)
         assert result['processed_text'] == ""
-
-
+        assert result['tokens'] == []
 class TestFeatureEngineer:
     """Test cases for the FeatureEngineer."""
     

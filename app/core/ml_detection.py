@@ -71,7 +71,7 @@ class TextPreprocessor:
             language: Language code ('en', 'hi', 'hinglish')
         """
         self.language = language
-        self.stemmer = PorterStemmer() if NLTK_AVAILABLE else None
+        self.stemmer = PorterStemmer() if NLTK_AVAILABLE and language == 'en' else None
         
         # Load stopwords based on language
         if NLTK_AVAILABLE:
@@ -279,7 +279,7 @@ class FeatureEngineer:
         features = {}
         
         if not text:
-            return {f'custom_{i}': 0.0 for i in range(20)}
+            return {name: 0.0 for name in self._get_custom_feature_names_list()}
         
         text_lower = text.lower()
         
@@ -439,16 +439,20 @@ class FeatureEngineer:
         feature_names.extend([f"count_{name}" for name in self.count_vectorizer.get_feature_names_out()])
         
         # Custom features
-        custom_feature_names = [
+        custom_feature_names = self._get_custom_feature_names_list()
+        feature_names.extend(custom_feature_names)
+        
+        return feature_names
+
+    def _get_custom_feature_names_list(self) -> List[str]:
+        """Get list of custom feature names."""
+        return [
             'text_length', 'word_count', 'avg_word_length', 'exclamation_count',
             'question_count', 'caps_ratio', 'urgency_score', 'financial_score',
             'trust_score', 'authority_score', 'fear_score', 'contact_request_score',
             'phone_number_present', 'upi_id_present', 'url_present', 'email_present',
             'repeated_chars', 'repeated_words', 'hinglish_score'
         ]
-        feature_names.extend(custom_feature_names)
-        
-        return feature_names
 
 
 class EnsembleScamClassifier:
@@ -514,18 +518,16 @@ class EnsembleScamClassifier:
         """
         logger.info(f"Training ensemble classifier on {X.shape[0]} samples with {X.shape[1]} features")
         
-        # Fit individual models
-        for name, model in self.models.items():
-            logger.info(f"Training {name}")
-            model.fit(X, y)
-        
         # Fit ensemble
+        # Note: VotingClassifier will automatically fit the underlying estimators
         logger.info("Training ensemble")
         self.ensemble.fit(X, y)
         
         # Calculate feature importance (from Random Forest)
-        if hasattr(self.models['random_forest'], 'feature_importances_'):
-            self.feature_importance_ = self.models['random_forest'].feature_importances_
+        if hasattr(self.ensemble, 'named_estimators_') and 'random_forest' in self.ensemble.named_estimators_:
+            rf_model = self.ensemble.named_estimators_['random_forest']
+            if hasattr(rf_model, 'feature_importances_'):
+                self.feature_importance_ = rf_model.feature_importances_
         
         self.is_fitted = True
         logger.info("Ensemble classifier training completed")
@@ -576,8 +578,16 @@ class EnsembleScamClassifier:
             raise ValueError("Classifier must be fitted before prediction")
         
         predictions = {}
-        for name, model in self.models.items():
-            predictions[name] = model.predict_proba(X)[:, 1]  # Probability of positive class
+        # Access fitted estimators from the ensemble
+        if hasattr(self.ensemble, 'named_estimators_'):
+            for name, model in self.ensemble.named_estimators_.items():
+                predictions[name] = model.predict_proba(X)[:, 1]
+        elif hasattr(self.ensemble, 'estimators_'):
+             # Fallback for newer scikit-learn versions
+             for i, model in enumerate(self.ensemble.estimators_):
+                 if hasattr(model, 'predict_proba'):
+                     name = self.ensemble.estimators[i][0]
+                     predictions[name] = model.predict_proba(X)[:, 1]
         
         return predictions
     
@@ -644,7 +654,22 @@ class MLScamDetector:
             model_path: Path to saved model files
         """
         self.model_path = Path(model_path) if model_path else Path("models")
-        self.model_path.mkdir(exist_ok=True)
+        
+        # Security check for model path
+        try:
+            # Resolve to absolute path
+            self.model_path = self.model_path.resolve()
+            # Ensure it is within the application directory or a specific allowlist
+            app_root = Path.cwd().resolve()
+            if not str(self.model_path).startswith(str(app_root)):
+                 # Fallback to safe default if outside project
+                 logger.warning(f"Model path {self.model_path} is outside application root. Reverting to default 'models'.")
+                 self.model_path = app_root / "models"
+        except Exception as e:
+            logger.error(f"Error checking model path: {e}")
+            self.model_path = Path("models").resolve()
+            
+        self.model_path.mkdir(exist_ok=True, parents=True)
         
         self.preprocessor = TextPreprocessor()
         self.feature_engineer = FeatureEngineer()
@@ -733,9 +758,12 @@ class MLScamDetector:
         
         # Add conversation context if available
         if conversation_history:
-            context_text = ' '.join(conversation_history[-3:])  # Last 3 messages
-            processed_text = f"{processed_text} CONTEXT: {context_text}"
-        
+            # Preprocess context messages
+            context_processed = []
+            for msg in conversation_history[-3:]:
+                ctx_info = self.preprocessor.preprocess(msg)
+                context_processed.append(ctx_info['processed_text'])
+            processed_text = f"{processed_text} {' '.join(context_processed)}"        
         # Extract features
         X = self.feature_engineer.transform([processed_text])
         
@@ -802,19 +830,45 @@ class MLScamDetector:
     def _load_model(self):
         """Load trained model from disk."""
         try:
+            # Security check: Ensure model_path is within expected directory
+            try:
+                # Get the absolute path and resolve symlinks
+                abs_model_path = self.model_path.resolve()
+                app_root = Path(__file__).parent.parent.resolve()
+                models_dir = app_root / "models"
+                
+                # If the path is not under app/models, it might be a security risk (unless it's during tests)
+                if "tests" not in str(abs_model_path) and not str(abs_model_path).startswith(str(models_dir)):
+                     # We still allow perfectly relative paths to models/ in current directory
+                     if not str(abs_model_path).startswith(str(Path("models").resolve())):
+                        logger.warning(f"Prevented attempt to load model from suspicious path: {self.model_path}")
+                        return
+            except Exception as pe:
+                logger.debug(f"Path validation skipped: {pe}")
+
             feature_engineer_path = self.model_path / "feature_engineer.pkl"
             classifier_path = self.model_path / "classifier.pkl"
             metadata_path = self.model_path / "metadata.json"
             
-            if all(path.exists() for path in [feature_engineer_path, classifier_path, metadata_path]):
-                # Load components
-                self.feature_engineer = joblib.load(feature_engineer_path)
-                self.classifier = joblib.load(classifier_path)
-                
-                # Load metadata
+            # Security checks for file loading
+            safe_paths = []
+            for path in [feature_engineer_path, classifier_path, metadata_path]:
+                if path.exists() and path.is_file():
+                    safe_paths.append(path)
+            
+            if len(safe_paths) == 3:
+                # Load metadata first to verify integrity if possible
                 with open(metadata_path, 'r') as f:
                     import json
                     metadata = json.load(f)
+                
+                # Checksum verification (placeholder - requires generation support)
+                # if 'checksums' in metadata:
+                #    verify_checksums(safe_paths, metadata['checksums'])
+
+                # Load components
+                self.feature_engineer = joblib.load(feature_engineer_path)
+                self.classifier = joblib.load(classifier_path)
                 
                 self.is_trained = metadata.get('is_trained', False)
                 
@@ -909,8 +963,7 @@ class MLScamDetector:
             "Family sab theek hai na? Long time since we talked.",
             "Vacation plans bana rahe hain. Kahan jaana hai?",
             "New restaurant try kiya? Food kaisa tha?",
-            "Exercise kar rahe ho요즘? Health maintain karna important hai.",
-            "Good morning! Hope you slept well last night.",
+            "Exercise kar rahe ho aajkal? Health maintain karna important hai.",            "Good morning! Hope you slept well last night.",
             "The presentation went really well today. Thanks for your support.",
             "Looking forward to the weekend. Any plans?",
             "The new coffee shop near office is quite good.",

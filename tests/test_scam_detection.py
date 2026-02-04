@@ -15,6 +15,8 @@ class TestScamDetectionEngine:
     def setup_method(self):
         """Set up test fixtures."""
         self.engine = ScamDetectionEngine()
+        # Disable ML detector for deterministic testing
+        self.engine.ml_detector.is_trained = False
     
     def test_financial_keyword_detection(self):
         """Test detection of financial keywords."""
@@ -52,7 +54,8 @@ class TestScamDetectionEngine:
             risk_score, confidence = self.engine.calculate_risk_score(message)
             if should_detect:
                 assert risk_score > 0.05, f"Should detect urgency in: {message}"
-    
+            else:
+                assert risk_score < 0.3, f"Should not detect urgency in: {message}"    
     def test_social_engineering_detection(self):
         """Test detection of social engineering patterns."""
         test_cases = [
@@ -69,6 +72,8 @@ class TestScamDetectionEngine:
             risk_score, confidence = self.engine.calculate_risk_score(message)
             if should_detect:
                 assert risk_score > 0.05, f"Should detect social engineering in: {message}"
+            else:
+                assert risk_score <= 0.05, f"Should not detect social engineering in: {message}"
     
     def test_contact_information_request_detection(self):
         """Test detection of contact information requests."""
@@ -282,7 +287,8 @@ class TestScamDetectionEngine:
             risk_score, confidence = self.engine.calculate_risk_score(message)
             if should_detect:
                 assert risk_score > 0.1, f"Should detect Hinglish scam patterns in: {message}"
-    
+            else:
+                assert risk_score < 0.3, f"Should not detect Hinglish scam patterns in: {message}"    
     def test_pattern_matching(self):
         """Test pattern matching for suspicious elements."""
         test_cases = [
@@ -298,7 +304,8 @@ class TestScamDetectionEngine:
             risk_score, confidence = self.engine.calculate_risk_score(message)
             if should_detect:
                 assert risk_score > 0.035, f"Should detect suspicious patterns in: {message}"  # Lowered from 0.04
-    
+            else:
+                assert risk_score < 0.3, f"Should not detect suspicious patterns in: {message}"    
     def test_risk_score_bounds(self):
         """Test that risk scores are within valid bounds."""
         test_messages = [
@@ -329,14 +336,13 @@ class TestScamDetectionEngine:
     
     def test_error_handling(self):
         """Test error handling in risk calculation."""
-        # Test with None message (should handle gracefully)
+        # Test with empty message (should handle gracefully)
         risk_score, confidence = self.engine.calculate_risk_score("")
         
         assert isinstance(risk_score, float)
         assert isinstance(confidence, float)
         assert 0.0 <= risk_score <= 1.0
         assert 0.0 <= confidence <= 1.0
-
 
 class TestLanguageDetector:
     """Test cases for the LanguageDetector."""
@@ -435,9 +441,11 @@ class TestScamDetectionIntegration:
             detected_lang = LanguageDetector.detect_language(message)
             risk_score, confidence = self.engine.calculate_risk_score(message)
             
+            # Verify language detection
+            assert detected_lang == expected_lang, f"Expected {expected_lang} but got {detected_lang} for: {message}"
+            
             # Should detect scam regardless of language
-            assert risk_score > 0.2, f"Should detect scam in {expected_lang}: {message}"
-    
+            assert risk_score > 0.2, f"Should detect scam in {expected_lang}: {message}"    
     def test_false_positive_prevention(self):
         """Test that legitimate messages don't trigger false positives."""
         legitimate_messages = [

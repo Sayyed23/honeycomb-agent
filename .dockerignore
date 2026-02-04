@@ -40,9 +40,9 @@ coverage.xml
 # Documentation and temporary files
 docs/
 *.md
+!README.md
 LICENSE
 HoneyComb Agent.pdf
-
 # Docker
 Dockerfile
 docker-compose*.yml

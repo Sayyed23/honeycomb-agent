@@ -17,6 +17,7 @@ from app.core.validation import InputSanitizer, RequestValidator, SecurityHeader
 from app.core.scam_detection import ScamDetectionEngine, LanguageDetector
 from app.core.agent_activation import agent_activation_engine, ActivationDecision, PersonaType
 from app.core.conversation_engine import conversation_engine
+from app.core.entity_extraction import entity_extraction_engine
 from app.database.models import APIKey, Session as DBSession, Message, RiskAssessment
 from app.database.connection import get_db
 from app.database.utils import DatabaseManager
@@ -361,6 +362,31 @@ async def process_honeypot_message(
                             "generation_method": response_result.generation_method
                         }
                     )
+                    
+                    # Extract entities from the conversation (user message + response)
+                    try:
+                        full_conversation_text = request_data.message + " " + response_message
+                        extraction_result = await entity_extraction_engine.extract_entities(
+                            text=full_conversation_text,
+                            session_id=request_data.sessionId,
+                            context=f"Conversation turn {len(conversation_history) + 1}",
+                            confidence_threshold=0.8
+                        )
+                        
+                        context_logger.info(
+                            "Entity extraction completed",
+                            extra={
+                                "entities_extracted": extraction_result.high_confidence_count,
+                                "total_candidates": extraction_result.total_candidates,
+                                "processing_time_ms": extraction_result.processing_time_ms,
+                                "extraction_accuracy": extraction_result.extraction_summary.get('extraction_accuracy', 0)
+                            }
+                        )
+                        
+                    except Exception as e:
+                        context_logger.error(f"Error during entity extraction: {e}", exc_info=True)
+                        # Continue without entity extraction if there's an error
+                    
                 except Exception as e:
                     context_logger.error(f"Error generating persona response: {e}", exc_info=True)
                     # Fallback to placeholder response
@@ -380,6 +406,26 @@ async def process_honeypot_message(
                         "reasoning": activation_result.reasoning[:2]  # First 2 reasons
                     }
                 )
+                
+                # Still extract entities from high-risk messages for intelligence
+                try:
+                    extraction_result = await entity_extraction_engine.extract_entities(
+                        text=request_data.message,
+                        session_id=request_data.sessionId,
+                        context="High-risk message without agent activation",
+                        confidence_threshold=0.9  # Higher threshold for non-agent messages
+                    )
+                    
+                    context_logger.info(
+                        "Entity extraction completed for high-risk non-agent message",
+                        extra={
+                            "entities_extracted": extraction_result.high_confidence_count,
+                            "total_candidates": extraction_result.total_candidates
+                        }
+                    )
+                    
+                except Exception as e:
+                    context_logger.error(f"Error during entity extraction: {e}", exc_info=True)
         elif risk_score >= 0.5:
             # Medium risk - cautious response
             response_message = _generate_medium_risk_response(final_language)

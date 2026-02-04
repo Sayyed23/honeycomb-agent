@@ -119,8 +119,10 @@ async def demonstrate_redis_usage():
         
         await cache_manager.set_conversation_context(session_id, context_summary)
         cached_context = await cache_manager.get_conversation_context(session_id)
-        print(f"   ✓ Context cached and retrieved: {cached_context[:50]}...")
-        
+        if cached_context:
+            print(f"   ✓ Context cached and retrieved: {cached_context[:50]}...")
+        else:
+            print("   ✗ Failed to retrieve cached context")        
         print()
         
         # Test session completion

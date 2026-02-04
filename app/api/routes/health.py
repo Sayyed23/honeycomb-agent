@@ -57,9 +57,8 @@ class ComponentHealth:
     async def check_llm() -> bool:
         """Check LLM service availability."""
         try:
-            # TODO: Implement actual LLM health check
-            # For now, return True as placeholder
-            return True
+            from app.core.llm_client import llm_client
+            return await llm_client.health_check()
         except Exception as e:
             logger.error(f"LLM health check failed: {e}")
             return False

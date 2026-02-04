@@ -779,6 +779,58 @@ class AuditLogger:
         self._log_audit_event(audit_event)
         return event_id
     
+    def log_llm_generation(
+        self,
+        session_id: str,
+        persona: str,
+        prompt_length: int,
+        response_length: int,
+        processing_time_ms: int,
+        model_used: str,
+        safety_filtered: bool = False,
+        correlation_id: Optional[str] = None
+    ) -> str:
+        """
+        Log an LLM generation audit event.
+        
+        Args:
+            session_id: Session identifier
+            persona: Persona used for generation
+            prompt_length: Length of the prompt in characters
+            response_length: Length of the response in characters
+            processing_time_ms: Processing time in milliseconds
+            model_used: LLM model used for generation
+            safety_filtered: Whether response was safety filtered
+            correlation_id: Correlation ID for request tracking
+            
+        Returns:
+            str: Event ID for the logged audit event
+        """
+        # Create audit event
+        event_id = str(uuid.uuid4())
+        audit_event = AuditEvent(
+            event_id=event_id,
+            event_type=AuditEventType.CONVERSATION_ANALYSIS,  # Reusing existing type
+            severity=AuditSeverity.LOW,
+            timestamp=datetime.utcnow(),
+            session_id=session_id,
+            event_data={
+                "llm_generation": {
+                    "persona": persona,
+                    "prompt_length": prompt_length,
+                    "response_length": response_length,
+                    "processing_time_ms": processing_time_ms,
+                    "model_used": model_used,
+                    "safety_filtered": safety_filtered
+                }
+            },
+            correlation_id=correlation_id,
+            processing_time_ms=processing_time_ms
+        )
+        
+        self._log_audit_event(audit_event)
+        return event_id
+    
     def _generate_risk_assessment_rationale(
         self,
         risk_score: float,

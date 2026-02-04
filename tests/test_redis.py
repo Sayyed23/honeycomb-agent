@@ -70,9 +70,9 @@ class TestCacheManager:
         """Setup Redis for testing."""
         try:
             await redis_manager.initialize()
+            yield
         except Exception as e:
-            pytest.skip(f"Redis not available for testing: {e}")
-    
+            pytest.skip(f"Redis not available for testing: {e}")    
     @pytest.mark.asyncio
     async def test_session_state_caching(self):
         """Test session state caching operations."""

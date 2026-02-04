@@ -280,10 +280,10 @@ class CacheManager:
             key = self.key_builder.entity_validation(entity_type, entity_value)
             
             result = await client.set(key, str(is_valid).lower(), ex=ttl)
-            logger.debug(f"Cached entity validation for {entity_type}:{entity_value}")
+            logger.debug(f"Cached entity validation for {entity_type}")
             return bool(result)
         except Exception as e:
-            logger.error(f"Failed to cache entity validation for {entity_type}:{entity_value}: {e}")
+            logger.error(f"Failed to cache entity validation for {entity_type}: {e}")
             return False
     
     async def get_entity_validation(self, entity_type: str, entity_value: str) -> Optional[bool]:
@@ -304,14 +304,12 @@ class CacheManager:
             cached_data = await client.get(key)
             if cached_data:
                 is_valid = cached_data.lower() == 'true'
-                logger.debug(f"Retrieved entity validation for {entity_type}:{entity_value}")
+                logger.debug(f"Retrieved entity validation for {entity_type}")
                 return is_valid
             return None
         except Exception as e:
-            logger.error(f"Failed to retrieve entity validation for {entity_type}:{entity_value}: {e}")
-            return None
-    
-    # Conversation Context Caching
+            logger.error(f"Failed to retrieve entity validation for {entity_type}: {e}")
+            return None    # Conversation Context Caching
     async def set_conversation_context(self, session_id: str, context: str, ttl: int = 1800) -> bool:
         """
         Cache conversation context summary.

@@ -63,8 +63,8 @@ class TestAgentActivationEngine:
         assert result.decision == ActivationDecision.NO_ACTIVATE
         assert result.persona is None
         assert result.response_template is not None
-        assert 'risk_score_below_threshold' in result.reasoning[0]
-    
+        assert len(result.reasoning) > 0
+        assert any('risk_score_below_threshold' in reason for reason in result.reasoning)    
     @pytest.mark.asyncio
     async def test_persona_selection_logic(self, activation_engine):
         """Test persona selection based on message characteristics."""

@@ -115,15 +115,17 @@ class TestHoneypotAPIIntegration:
         """Test honeypot endpoint with invalid JSON."""
         headers = {"x-api-key": self.test_api_key}
         
-        # Send invalid JSON
-        response = self.client.post(
-            "/api/honeypot", 
-            data="invalid json", 
-            headers=headers
-        )
+        with patch('app.core.auth.APIKeyManager.validate_api_key') as mock_validate:
+            mock_validate.return_value = self.mock_api_key
+            
+            # Send invalid JSON
+            response = self.client.post(
+                "/api/honeypot", 
+                data="invalid json", 
+                headers=headers
+            )
         
-        assert response.status_code == 422  # FastAPI validation error
-    
+        assert response.status_code == 422  # FastAPI validation error    
     def test_honeypot_endpoint_missing_required_fields(self):
         """Test honeypot endpoint with missing required fields."""
         payload = {

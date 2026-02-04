@@ -246,8 +246,7 @@ class AuditLogSearcher:
             
         except Exception as e:
             logger.error(f"Error generating compliance report: {e}", exc_info=True)
-            return {"error": f"Failed to generate report: {e}"}
-    
+            return {"error": "Failed to generate compliance report. Check logs for details."}    
     def _parse_log_entries(self) -> List[AuditLogEntry]:
         """
         Parse audit log entries from the log source.
@@ -366,15 +365,21 @@ class AuditLogSearcher:
         try:
             reverse = sort_order.lower() == "desc"
             
+            def sort_key(e):
+                val = self._get_field_value(e, sort_by)
+                if val is None:
+                    # Place None values at end regardless of sort order
+                    return (1, "")
+                return (0, val)
+            
             return sorted(
                 entries,
-                key=lambda e: self._get_field_value(e, sort_by) or "",
+                key=sort_key,
                 reverse=reverse
             )
             
         except Exception:
-            return entries
-    
+            return entries    
     def _count_aggregation(self, entries: List[AuditLogEntry], group_by: List[str]) -> Dict[str, int]:
         """Perform count aggregation grouped by specified fields."""
         if not group_by:
@@ -569,14 +574,17 @@ class AuditLogSearcher:
         }
     
     def _calculate_compliance_metrics(self, entries: List[AuditLogEntry]) -> Dict[str, Any]:
-        """Calculate compliance-related metrics."""
+        """Calculate compliance-related metrics.
+        
+        TODO: Implement actual compliance calculations based on entries.
+        Currently returns static placeholder values.
+        """
         return {
-            "audit_coverage": "100%",  # All operations are audited
+            "audit_coverage": "100%",  # Placeholder - assumes all operations are audited
             "data_retention_compliance": "Compliant",
             "access_logging": "Complete",
             "decision_rationale_coverage": "100%"
-        }
-    
+        }    
     def _generate_detailed_findings(self, entries: List[AuditLogEntry]) -> List[Dict[str, Any]]:
         """Generate detailed findings from audit analysis."""
         findings = []

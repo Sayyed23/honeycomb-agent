@@ -44,10 +44,12 @@ def test_engine():
     Base.metadata.drop_all(bind=engine)
     
     # Remove test database file
-    db_file = Path("./test.db")
-    if db_file.exists():
-        db_file.unlink()
-
+    db_url = test_settings.database.url
+    if db_url.startswith("sqlite:///") and ":memory:" not in db_url:
+        db_path = db_url.replace("sqlite:///", "")
+        db_file = Path(db_path)
+        if db_file.exists():
+            db_file.unlink()
 
 @pytest.fixture(scope="function")
 def test_db(test_engine):
@@ -120,9 +122,8 @@ def sample_api_key(test_db):
     )
     
     test_db.add(api_key_record)
-    test_db.commit()
-    test_db.refresh(api_key_record)
-    
+    test_db.flush()
+    test_db.refresh(api_key_record)    
     return {
         "api_key": api_key,
         "record": api_key_record

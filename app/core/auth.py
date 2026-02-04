@@ -311,7 +311,7 @@ async def validate_api_key_dependency(
             extra={
                 "client_ip": request.client.host if request.client else None,
                 "user_agent": request.headers.get("user-agent"),
-                "endpoint": str(request.url)
+                "endpoint": request.url.path
             }
         )
         raise HTTPException(

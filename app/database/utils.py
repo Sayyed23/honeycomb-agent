@@ -332,11 +332,15 @@ class DatabaseManager:
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=days_old)
             
-            # Delete old completed sessions
-            deleted_count = self.db.query(Session).filter(
+            # Fetch and delete old completed sessions (respects ORM cascades)
+            old_sessions = self.db.query(Session).filter(
                 Session.status == 'completed',
                 Session.end_time < cutoff_date
-            ).delete()
+            ).all()
+            
+            deleted_count = len(old_sessions)
+            for session in old_sessions:
+                self.db.delete(session)
             
             self.db.commit()
             

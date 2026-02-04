@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict, Counter
 import statistics
 import time
@@ -79,7 +79,7 @@ class ScamDetectionEngine:
     """
     
     # Financial keywords that indicate potential scams
-    FINANCIAL_KEYWORDS = [
+    FINANCIAL_KEYWORDS = list(set([
         # English
         'money', 'payment', 'transfer', 'bank', 'account', 'upi', 'paytm', 'gpay', 'phonepe',
         'cash', 'rupees', 'dollars', 'amount', 'fund', 'deposit', 'withdraw', 'transaction',
@@ -97,7 +97,7 @@ class ScamDetectionEngine:
         # Common UPI patterns
         'upi id', 'upi-id', 'upi_id', 'google pay', 'paytm number', 'phone pe',
         'bhim', 'amazon pay', 'mobikwik', 'freecharge'
-    ]
+    ]))
     
     # Urgency indicators
     URGENCY_KEYWORDS = [
@@ -197,7 +197,15 @@ class ScamDetectionEngine:
         """Initialize the scam detection engine."""
         self.compiled_patterns = {
             'contact_requests': [re.compile(pattern, re.IGNORECASE) for pattern in self.CONTACT_REQUEST_PATTERNS],
-            'suspicious': [re.compile(pattern, re.IGNORECASE) for pattern in self.SUSPICIOUS_PATTERNS]
+            'suspicious': {
+                'phone_number_detected': re.compile(r'\b(?:\+91|91)?[6-9]\d{9}\b'),
+                'upi_id_detected': re.compile(r'\b\w+@(?:paytm|phonepe|googlepay|okaxis|ybl|ibl|axl)\b', re.IGNORECASE),
+                'url_detected': re.compile(r'https?://[^\s]+'),
+                'excessive_punctuation': re.compile(r'[!]{2,}|[?]{2,}'),
+                'excessive_caps': re.compile(r'\b[A-Z]{4,}\b'),
+                'email_detected': re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'),
+                'repeated_chars': re.compile(r'(.)\1{3,}')
+            }
         }
         
         # Initialize ML detector
@@ -391,10 +399,11 @@ class ScamDetectionEngine:
         }
         
         # ML-based classification
-        ml_score, ml_factors = self._analyze_ml_classification(message, conversation_history)
-        risk_scores.append(ml_score)
-        risk_factors.extend(ml_factors)
-        details['ml_score'] = ml_score
+        if self.ml_detector.is_trained:
+            ml_score, ml_factors = self._analyze_ml_classification(message, conversation_history)
+            risk_scores.append(ml_score)
+            risk_factors.extend(ml_factors)
+            details['ml_score'] = ml_score
         
         # Get ML prediction details
         if self.ml_detector.is_trained:
@@ -487,23 +496,23 @@ class ScamDetectionEngine:
         if financial_matches > 0:
             risk_factors.append(f"financial_keywords_{financial_matches}")
             # More aggressive scoring for financial keywords
-            score += min(0.4, financial_matches * 0.15)
+            score += min(0.5, financial_matches * 0.2)
         
         # Check for urgency indicators - increased scoring
         urgency_matches = sum(1 for keyword in self.URGENCY_KEYWORDS if keyword in message_lower)
         if urgency_matches > 0:
             risk_factors.append(f"urgency_indicators_{urgency_matches}")
             # More aggressive scoring for urgency
-            score += min(0.3, urgency_matches * 0.1)
+            score += min(0.5, urgency_matches * 0.25)
         
         # Check for social engineering - increased scoring
         social_matches = sum(1 for keyword in self.SOCIAL_ENGINEERING_KEYWORDS if keyword in message_lower)
         if social_matches > 0:
             risk_factors.append(f"social_engineering_{social_matches}")
             # More aggressive scoring for social engineering
-            score += min(0.35, social_matches * 0.1)
+            score += min(0.5, social_matches * 0.25)
         
-        return min(score, 0.6), risk_factors
+        return min(score, 0.7), risk_factors
     
     def _analyze_keywords(self, message: str) -> Tuple[float, List[str]]:
         """
@@ -522,7 +531,7 @@ class ScamDetectionEngine:
         for pattern in self.compiled_patterns['contact_requests']:
             if pattern.search(message):
                 risk_factors.append("contact_info_request")
-                score += 0.25  # Increased from 0.15
+                score += 0.35  # Increased from 0.3
                 break
         
         # Check for money-related urgency combinations - increased scoring
@@ -530,6 +539,11 @@ class ScamDetectionEngine:
            any(keyword in message.lower() for keyword in ['urgent', 'immediately', 'asap']):
             risk_factors.append("urgent_money_request")
             score += 0.3  # Increased from 0.2
+            
+        # Check for standalone urgency keywords
+        elif any(keyword in message.lower() for keyword in self.URGENCY_KEYWORDS):
+            risk_factors.append("urgency_detected")
+            score += 0.15
         
         # Check for trust-building with financial requests - increased scoring
         if any(keyword in message.lower() for keyword in ['trust', 'honest', 'genuine']) and \
@@ -567,27 +581,27 @@ class ScamDetectionEngine:
         score = 0.0
         
         # Check suspicious patterns with improved scoring
-        for pattern in self.compiled_patterns['suspicious']:
+        for risk_name, pattern in self.compiled_patterns['suspicious'].items():
             matches = pattern.findall(message)
             if matches:
-                if 'phone' in pattern.pattern or r'\b(?:\+91|91)?[6-9]\d{9}\b' in pattern.pattern:
+                if risk_name == 'phone_number_detected':
                     risk_factors.append("phone_number_detected")
-                    score += 0.2  # Increased from 0.1
-                elif 'upi' in pattern.pattern or '@(?:paytm|phonepe|googlepay|okaxis|ybl|ibl|axl)' in pattern.pattern:
+                    score += 0.3
+                elif risk_name == 'upi_id_detected':
                     risk_factors.append("upi_id_detected")
-                    score += 0.25  # Increased from 0.15
-                elif 'http' in pattern.pattern:
+                    score += 0.4
+                elif risk_name == 'url_detected':
                     risk_factors.append("url_detected")
-                    score += 0.15  # Increased from 0.1
-                elif '[!]' in pattern.pattern or '[?]' in pattern.pattern:
+                    score += 0.3
+                elif risk_name == 'excessive_punctuation':
                     risk_factors.append("excessive_punctuation")
-                    score += 0.1  # Increased from 0.05
-                elif '[A-Z]' in pattern.pattern:
+                    score += 0.3
+                elif risk_name == 'excessive_caps':
                     risk_factors.append("excessive_caps")
-                    score += 0.1  # Increased from 0.05
-                elif r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}' in pattern.pattern:
+                    score += 0.3
+                elif risk_name == 'email_detected':
                     risk_factors.append("email_detected")
-                    score += 0.15
+                    score += 0.3
         
         # Additional pattern checks
         # Check for multiple exclamation marks (strong urgency indicator)
@@ -647,7 +661,7 @@ class ScamDetectionEngine:
         score += legacy_score
         risk_factors.extend(legacy_factors)
         
-        return min(score, 0.4), risk_factors
+        return min(score, 0.6), risk_factors
     
     def _analyze_temporal_patterns(self, conversation_history: List[Dict[str, Any]]) -> TemporalPattern:
         """
@@ -681,9 +695,9 @@ class ScamDetectionEngine:
                     timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
                 except (ValueError, AttributeError):
                     # Fallback to current time if parsing fails
-                    timestamp = datetime.utcnow()
+                    timestamp = datetime.now(timezone.utc)
             elif not isinstance(timestamp, datetime):
-                timestamp = datetime.utcnow()
+                timestamp = datetime.now(timezone.utc)
             
             timestamps.append(timestamp)
             
@@ -1280,13 +1294,13 @@ class ScamDetectionEngine:
             if isinstance(prev_time, str):
                 try:
                     prev_time = datetime.fromisoformat(prev_time.replace('Z', '+00:00'))
-                except:
+                except ValueError:
                     continue
             
             if isinstance(curr_time, str):
                 try:
                     curr_time = datetime.fromisoformat(curr_time.replace('Z', '+00:00'))
-                except:
+                except ValueError:
                     continue
             
             if isinstance(prev_time, datetime) and isinstance(curr_time, datetime):
@@ -1588,10 +1602,10 @@ class ScamDetectionEngine:
         # Updated weights for different analysis components
         # Balanced weights between rule-based and ML approaches
         if len(scores) >= 5:  # All components including ML
-            weights = [0.25, 0.25, 0.1, 0.05, 0.35]  # rule_based, keyword, pattern, context, ml
+            weights = [0.2, 0.2, 0.1, 0.25, 0.25]  # rule_based, keyword, pattern, context, ml
         else:
-            # Fallback weights if ML is not available
-            weights = [0.4, 0.35, 0.15, 0.1]  # rule_based, keyword, pattern, context
+            # Fallback weights if ML is not available - focus on primary indicators
+            weights = [0.25, 0.25, 0.15, 0.35]  # rule_based, keyword, pattern, context
         
         # Ensure we have enough weights
         if len(scores) > len(weights):
@@ -1606,29 +1620,29 @@ class ScamDetectionEngine:
         
         # Apply boost for high individual scores - more aggressive
         max_score = max(scores) if scores else 0.0
-        if max_score > 0.4:  # Lowered threshold from 0.5
+        if max_score >= 0.3:  # Lowered threshold from 0.4/0.5
             # Boost the final score if any component is high
-            boost_factor = 1.0 + (max_score - 0.4) * 0.8  # Increased boost
+            boost_factor = 1.0 + (max_score - 0.25) * 1.2  # Much more aggressive boost
             weighted_score *= boost_factor
         
         # Apply additional boost for multiple high scores - more aggressive
-        high_scores = [s for s in scores if s > 0.2]  # Lowered threshold from 0.3
+        high_scores = [s for s in scores if s >= 0.2]  # Lowered threshold from 0.3
         if len(high_scores) >= 3:
             # Multiple high-risk components detected
-            multi_factor_boost = 1.0 + (len(high_scores) - 2) * 0.25  # Increased boost
+            multi_factor_boost = 1.0 + (len(high_scores) - 2) * 0.5  # Increased boost
             weighted_score *= multi_factor_boost
         elif len(high_scores) >= 2:
             # Two high-risk components
-            weighted_score *= 1.2  # Increased from 1.1
+            weighted_score *= 1.4  # Increased from 1.2
         
         # Special boost if both ML and rule-based are high
         if len(scores) >= 5:  # ML available
             ml_score = scores[4]  # ML is the 5th component
             rule_based_avg = sum(scores[:4]) / 4  # Average of rule-based components
             
-            if ml_score > 0.3 and rule_based_avg > 0.2:  # Lowered thresholds
+            if ml_score > 0.25 and rule_based_avg > 0.2:  # Lowered thresholds
                 # Both ML and rule-based indicate risk
-                weighted_score *= 1.3  # Increased from 1.2
+                weighted_score *= 1.4  # Increased from 1.3
         
         return min(weighted_score, 1.0)
     
@@ -1705,8 +1719,8 @@ class LanguageDetector:
         if cls.HINDI_PATTERN.search(text):
             return 'hi'
         
-        # Check for Hinglish words
-        hinglish_count = sum(1 for word in cls.HINGLISH_WORDS if word in text_lower)
+        words = set(text_lower.split())
+        hinglish_count = sum(1 for word in cls.HINGLISH_WORDS if word in words)
         total_words = len(text_lower.split())
         
         if total_words > 0 and hinglish_count / total_words > 0.2:

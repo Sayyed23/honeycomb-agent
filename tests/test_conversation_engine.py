@@ -122,7 +122,7 @@ class TestConversationEngine:
         assert isinstance(result, ResponseGenerationResult)
         assert len(result.response_content) > 0
         assert 0.0 <= result.persona_consistency_score <= 1.0
-        assert result.generation_method == "persona_based"
+        assert result.generation_method == "llm_multi_turn"
         assert result.processing_time_ms >= 0
         assert isinstance(result.response_characteristics, dict)
     
@@ -137,13 +137,14 @@ class TestConversationEngine:
         mock_session_state.metrics.persona_type = None
         
         with patch('app.core.conversation_engine.session_manager') as mock_session_manager:
-            mock_session_manager.get_session.return_value = mock_session_state
+            async def mock_get_session(session_id):
+                return mock_session_state
+            mock_session_manager.get_session = mock_get_session
             
             result = await conversation_engine.generate_response(
                 session_id=session_id,
                 message_content=message_content
-            )
-        
+            )        
         # Should return fallback response
         assert isinstance(result, ResponseGenerationResult)
         assert result.generation_method == "fallback"

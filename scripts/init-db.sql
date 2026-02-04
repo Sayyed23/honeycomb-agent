@@ -15,14 +15,19 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";  -- For text search optimization
 -- Uses \gexec to execute dynamic SQL for conditional user creation
 -- effectively replacing: CREATE USER honeypot_user WITH ENCRYPTED PASSWORD :'DB_PASSWORD';
 -- wrapped in a check.
+-- Verify password is provided (fail fast rather than use weak default)
+SELECT CASE 
+    WHEN :'DB_PASSWORD' IS NULL OR :'DB_PASSWORD' = '' 
+    THEN (SELECT 1/0)  -- Force error if no password provided
+END;
+
 SELECT format(
     'CREATE USER honeypot_user WITH ENCRYPTED PASSWORD %L',
-    COALESCE(:'DB_PASSWORD', 'password')
+    :'DB_PASSWORD'
 )
 WHERE NOT EXISTS (
     SELECT FROM pg_catalog.pg_roles WHERE rolname = 'honeypot_user'
 ) \gexec
-
 -- Grant necessary privileges
 GRANT ALL PRIVILEGES ON DATABASE honeypot_api TO honeypot_user;
 GRANT ALL ON SCHEMA public TO honeypot_user;
