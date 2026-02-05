@@ -6,7 +6,11 @@
 - **Problem**: `app/main.py` was using `asyncio.wait_for()` without importing `asyncio`
 - **Fix**: Added `import asyncio` to the imports
 
-### 2. Slow Startup Process
+### 2. PORT Environment Variable Issue
+- **Problem**: Railway's `$PORT` environment variable wasn't being expanded properly in Docker CMD
+- **Fix**: Created `start.sh` script with proper shell variable expansion and used ENTRYPOINT
+
+### 3. Slow Startup Process
 - **Problem**: Redis and other service initialization was taking too long, causing Railway health checks to fail
 - **Fix**: Reduced all timeouts and made all optional services non-blocking:
   - Redis initialization timeout: 5s → 2s → 1s
@@ -14,14 +18,15 @@
   - Callback manager timeout: 3s → 1s
   - All services are now truly optional and won't block startup
 
-### 3. Complex Health Check
+### 4. Complex Health Check
 - **Problem**: `/health` endpoint was doing complex checks that could fail or timeout
 - **Fix**: 
   - Added simple `/ready` endpoint for Railway health checks
   - Updated `railway.json` to use `/ready` instead of `/health`
   - Reduced health check timeout from 300s to 60s
+  - Removed `startCommand` from railway.json to use Dockerfile ENTRYPOINT
 
-### 4. Redis Connection Issues
+### 5. Redis Connection Issues
 - **Problem**: Redis connection was blocking startup when Redis wasn't available
 - **Fix**: 
   - Made Redis connection completely non-blocking
@@ -46,6 +51,17 @@
    - Changed health check path from `/health` to `/ready`
    - Reduced health check timeout from 300s to 60s
    - Reduced max retries from 10 to 3
+   - Removed `startCommand` to use Dockerfile ENTRYPOINT
+
+4. **Dockerfile**
+   - Added `start.sh` script for proper PORT variable handling
+   - Changed from CMD to ENTRYPOINT for better signal handling
+   - Made start script executable
+
+5. **start.sh** (new file)
+   - Shell script that properly handles PORT environment variable
+   - Uses `${PORT:-8000}` syntax for default fallback
+   - Uses `exec` for proper signal handling
 
 ## Environment Variables for Railway
 
@@ -54,7 +70,6 @@ The following environment variables need to be set in the Railway dashboard (not
 ### Required Variables
 ```
 ENVIRONMENT=production
-PORT=8000
 GEMINI_API_KEY=AQ.Ab8RN6IEnV3947SFSsNurw6leoPjLu9f5HNItUtqoF593d5gzA
 x_API_KEY=iR3PgIodG2xKOCsKa7eNK6HrVKMNHOpzQmfDD6wPs
 API_KEY_SECRET=95a803558aa2ee25732820868663eac100365b95f40e59a76fb1bc9bbab77f8e
@@ -68,12 +83,15 @@ GUVI_CALLBACK_URL=https://hackathon.guvi.in/api/updateHoneyPotFinalResult
 GUVI_API_KEY=test-guvi-key
 ```
 
+**Note**: `PORT` is automatically set by Railway and doesn't need to be configured manually.
+
 ## Deployment Steps
 
 1. **Set Environment Variables in Railway Dashboard**
    - Go to your Railway project
    - Navigate to Variables tab
    - Add all the required environment variables listed above
+   - Do NOT set PORT - Railway sets this automatically
 
 2. **Deploy the Updated Code**
    - Push the changes to your repository
@@ -81,6 +99,7 @@ GUVI_API_KEY=test-guvi-key
 
 3. **Monitor the Deployment**
    - Check Railway logs for startup messages
+   - Look for "Starting server on port XXXX" from start.sh
    - Look for "Application startup completed successfully - ready to serve requests"
    - Health checks should now pass at `/ready` endpoint
 
@@ -102,6 +121,7 @@ After deployment, test these endpoints:
 If deployment still fails:
 
 1. **Check Railway Logs**
+   - Look for "Starting server on port XXXX" message
    - Look for startup errors or timeout messages
    - Verify environment variables are loaded correctly
 
@@ -112,10 +132,12 @@ If deployment still fails:
 3. **Verify Environment Variables**
    - Ensure all required variables are set in Railway dashboard
    - Check for typos in variable names
+   - Verify PORT is being set by Railway (should appear in logs)
 
 ## Expected Behavior
 
 - **Startup Time**: Should complete in under 5 seconds
+- **Port Handling**: Should show "Starting server on port XXXX" where XXXX is Railway's assigned port
 - **Health Checks**: Should pass consistently at `/ready` endpoint
 - **Redis**: Will show "degraded" status if Redis is unavailable (non-fatal)
 - **Database**: Uses SQLite by default, should always be healthy
