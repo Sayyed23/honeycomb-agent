@@ -2,6 +2,7 @@ import asyncio
 import time
 import uuid
 import os
+import random
 from datetime import datetime
 from typing import List, Optional, Dict, Any, Union
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, Header, status
@@ -164,16 +165,81 @@ async def process_honeypot_message(
         
         # 5. Response Generation
         if activation_result.decision == "ACTIVATE":
-            # Generate a persona-driven reply
-            ai_reply = await conversation_engine.generate_reply(
-                message_text=incoming_text,
-                history=internal_history,
-                persona=activation_result.persona,
-                context={"risk_score": risk_score}
-            )
+            # Generate a persona-driven reply using conversation engine
+            try:
+                response_result = await conversation_engine.generate_response(
+                    session_id=session_id,
+                    message_content=incoming_text,
+                    conversation_history=internal_history,
+                    metadata=analysis_metadata
+                )
+                ai_reply = response_result.response_content
+            except Exception as e:
+                logger.warning(f"Conversation engine failed, using fallback: {e}")
+                # Fallback to realistic responses if conversation engine fails
+                ai_reply = "Oh no! This sounds very serious. Can you help me understand what I need to do? What's your name and employee ID so I can verify you're legitimate?"
         else:
-            # Silent engagement or generic deflection
-            ai_reply = activation_result.response_template or "I'm not sure what you mean. Could you explain?"
+            # Always use highly realistic honeypot responses for better engagement
+            # Ignore the generic response_template from agent activation
+            message_lower = incoming_text.lower()
+            
+            # Bank/Financial scam responses
+            if any(word in message_lower for word in ['bank', 'account', 'blocked', 'suspended', 'otp', 'verify', 'urgent']):
+                realistic_responses = [
+                    "Oh my God, really? My account is blocked? I just used it yesterday to pay my electricity bill. What exactly happened? Can you tell me which transactions look suspicious? What's your name and employee ID? I want to make sure I'm talking to the right person.",
+                    "This is so scary! I have my salary in that account. How did someone get access? Do you know what they tried to do? Should I check my recent transactions? Can you give me your direct phone number in case I need to call back?",
+                    "Wait, what? I'm so confused right now. I got money from my son just last week through UPI. Could that be the problem? What should I do first? How do I know you're really from the bank? Can you prove it?",
+                    "Oh no! I was just about to transfer money to my daughter for her college fees. Is it safe to do that now? How do I unblock my account? Do you need my account number? What's your supervisor's name?",
+                    "This is terrible! I have all my pension money in that account. How long will it take to fix? What information do you need from me? Should I go to the bank branch? Which branch are you calling from?"
+                ]
+            
+            # Prize/Lottery scam responses  
+            elif any(word in message_lower for word in ['won', 'winner', 'prize', 'lottery', 'congratulations', 'claim']):
+                realistic_responses = [
+                    "Really?! I can't believe this! I never win anything! How much did I win exactly? My neighbor always says these things are fake, but this is real, right? What do I need to do to get my money? What's your company name?",
+                    "Oh wow! This is amazing! I was just telling my wife yesterday that we need money for our daughter's wedding. How did you get my number? What lottery was this for? Do I need to pay anything first? Can you send me official papers?",
+                    "I'm so excited! I've been buying lottery tickets for years and finally won something! Can you tell me exactly how much? My husband won't believe this! What documents do you need from me? What's your employee ID?",
+                    "This is incredible! I was just praying for some extra money to fix our roof. How do I claim this? Do I need to come somewhere? My son handles all my paperwork - should I call him? What's your office address?",
+                    "Wow! Is this really happening? I'm 65 years old and never won anything in my life! What's the next step? Do you need my bank details? How long does it take to get the money? Can you give me a reference number?"
+                ]
+            
+            # Tech support scam responses
+            elif any(word in message_lower for word in ['computer', 'virus', 'infected', 'software', 'download', 'technical', 'microsoft', 'windows']):
+                realistic_responses = [
+                    "Oh no! I knew something was wrong with my computer! It's been running so slowly lately and I keep getting strange pop-ups. I'm so worried I'll lose all my family photos! Can you help me fix it right now? What's your name and which company are you from?",
+                    "This explains everything! My computer has been acting weird for weeks. I was scared to use it for online banking. How bad is the infection? Can you clean it remotely? What software do I need to download? Is it free? What's your employee ID?",
+                    "Thank goodness you called! I was so worried about my computer problems. I only use it for email and Facebook, but lately it's been so slow. How did you know my computer was infected? Are you from Microsoft? What do I need to do first?",
+                    "I'm so relieved someone is helping me! My grandson usually fixes these things but he's away at college. Can you walk me through fixing it step by step? What's your direct phone number? How long will this take to fix?"
+                ]
+            
+            # Investment/Trading scam responses
+            elif any(word in message_lower for word in ['investment', 'trading', 'profit', 'returns', 'opportunity', 'money', 'earn']):
+                realistic_responses = [
+                    "This sounds very interesting! I've been looking for ways to grow my retirement money. My fixed deposits are giving such low returns these days. How much can I start with? What kind of profits do your other clients usually make? Is it guaranteed? What's your company name?",
+                    "I'm definitely interested! My neighbor was just telling me about people making good money from online investments. I have about 3 lakhs sitting in my savings account doing nothing. How does this work exactly? What's the minimum investment? Can you give me references?",
+                    "This could be perfect timing! I'm planning for my daughter's wedding next year and need to grow my money quickly. What kind of returns can I expect? How long does it take? Do you have an office I can visit? What's your registration number?",
+                    "I'm very interested! I'm retired and looking for additional income. My pension is not enough these days. What kind of experience do I need? Can you help me set everything up? What documents do you need? What's your supervisor's contact?"
+                ]
+            
+            # Job/Employment scam responses
+            elif any(word in message_lower for word in ['job', 'work', 'employment', 'salary', 'hiring', 'position']):
+                realistic_responses = [
+                    "This is perfect timing! I've been looking for work from home opportunities. I lost my job during COVID and haven't found anything stable since. What kind of work is it? How much does it pay? Do I need any special skills? What's your company name?",
+                    "I'm very interested! I'm a housewife and want to earn some extra money for my family. My husband's salary is not enough these days. Is this really work from home? What are the working hours? How do I apply? What's your HR department number?",
+                    "This sounds great! I just graduated and I'm looking for my first job. My parents are putting pressure on me to start earning. What qualifications do you need? Is there any training provided? When can I start? Can you send me company details?",
+                    "I need this job! I have two kids and my husband lost his job last month. We really need the income. What kind of work is involved? Do I get paid weekly or monthly? Is there any registration fee? What's your manager's name?"
+                ]
+            
+            # Generic highly engaging responses for other scams
+            else:
+                realistic_responses = [
+                    "This sounds really important and I want to understand everything properly. I'm a bit nervous because my son always warns me about scams, but you sound very professional. Can you explain this to me step by step? What exactly do you need from me? What's your name and company?",
+                    "I'm very interested but also want to be careful. My daughter handles most of my important matters, but she's at work right now. Can you give me more details about this? How did you get my contact information? What's your employee ID and direct number?",
+                    "This is quite overwhelming for me, but it sounds very important. I'm 68 years old and not very good with modern technology, so please be patient with me. Can you walk me through this slowly? What information do you need? What's your supervisor's name?",
+                    "I want to help but I'm not sure I understand everything. My daughter usually handles these kinds of things for me, but she's busy with work. Can you explain the process step by step? What documents do I need to prepare? Can you send me official papers?"
+                ]
+            
+            ai_reply = random.choice(realistic_responses)
 
         # 6. Post-Processing: Entity Extraction & Database Storage
         db_manager = DatabaseManager(db)

@@ -62,15 +62,17 @@ class AgentActivationEngine:
     Probabilistic agent activation engine that decides when to engage scammers.
     
     Implements sophisticated decision-making based on:
-    - Risk score thresholds (>0.75 for activation consideration)
-    - Probabilistic engagement (80-95% activation rate)
+    - Risk score thresholds (>0.50 for activation consideration)
+    - Probabilistic engagement (70-95% activation rate)
     - Contextual adjustments for timing and previous engagements
     - Persona selection based on message characteristics
     """
     
     # Base activation probabilities for different risk score ranges
     BASE_ACTIVATION_PROBABILITIES = {
-        (0.75, 0.80): 0.80,  # High risk, lower confidence
+        (0.50, 0.60): 0.70,  # Medium risk, moderate confidence
+        (0.60, 0.70): 0.75,  # Medium-high risk, good confidence
+        (0.70, 0.80): 0.80,  # High risk, lower confidence
         (0.80, 0.85): 0.85,  # High risk, medium confidence
         (0.85, 0.90): 0.90,  # Very high risk, high confidence
         (0.90, 0.95): 0.93,  # Extreme risk, very high confidence
@@ -154,8 +156,8 @@ class AgentActivationEngine:
                 session_id, session_state, conversation_history
             )
             
-            # Check if risk score meets activation threshold
-            if risk_score < 0.75:
+            # Check if risk score meets activation threshold (lowered for better engagement)
+            if risk_score < 0.50:
                 return await self._create_no_activation_result(
                     risk_score, confidence, contextual_factors,
                     reason="risk_score_below_threshold",
@@ -357,7 +359,7 @@ class AgentActivationEngine:
                 return max(0.75, min(0.95, final_prob))  # Ensure within bounds
         
         # Fallback for edge cases
-        return 0.95 if risk_score >= 0.95 else 0.80
+        return 0.95 if risk_score >= 0.95 else 0.70  # Increased fallback probability
     
     def _apply_contextual_adjustments(
         self,
@@ -670,8 +672,10 @@ class AgentActivationEngine:
             reasoning.append(f"Extremely high risk score ({risk_score:.3f}) indicates very likely scam")
         elif risk_score >= 0.85:
             reasoning.append(f"Very high risk score ({risk_score:.3f}) indicates likely scam")
-        elif risk_score >= 0.75:
+        elif risk_score >= 0.70:
             reasoning.append(f"High risk score ({risk_score:.3f}) meets activation threshold")
+        elif risk_score >= 0.50:
+            reasoning.append(f"Medium risk score ({risk_score:.3f}) meets activation threshold")
         
         # Confidence reasoning
         if confidence >= 0.8:

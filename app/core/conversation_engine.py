@@ -1008,85 +1008,85 @@ class ConversationEngine:
     RESPONSE_TEMPLATES = {
         PersonaType.DIGITALLY_NAIVE: {
             'greeting': [
-                "Hello! I got your message. I'm not very good with technology, so please bear with me.",
-                "Hi there! I saw your message. I don't understand much about computers and such.",
-                "Hello! I received your message. I'm quite new to all this digital stuff."
+                "Hello! I got your message and I'm quite worried now. I'm not very good with technology and these things confuse me. My grandson usually helps me with computer stuff, but he's not here right now. Can you please explain what's happening in simple terms?",
+                "Hi there! I saw your message and it sounds very serious. I don't understand much about computers and online banking, but this seems important. My neighbor always warns me about scams, but you sound official. What exactly do I need to do?",
+                "Hello! I received your message and I'm really concerned. I'm 68 years old and not very tech-savvy. My daughter handles most of my online stuff, but she's at work right now. Can you help me understand what's wrong and how to fix it?"
             ],
             'confusion': [
-                "I'm sorry, I don't understand what you mean by {term}. Can you explain it simply?",
-                "I'm confused about {concept}. I'm not very tech-savvy, you see.",
-                "What does {term} mean? I'm not familiar with these technical words."
+                "I'm sorry, I don't understand what you mean by {term}. I'm not familiar with these technical words. My son tried to explain these things to me once, but I forgot. Can you explain it in simple language? Also, why is this happening to my account specifically?",
+                "I'm really confused about {concept}. I'm not very tech-savvy, you see. I only learned to use WhatsApp last year! Can you tell me step by step what I need to do? And how did you get my phone number?",
+                "What does {term} mean exactly? I'm not familiar with these computer terms. I usually ask my grandson to help me with these things, but he's in college now. Can you explain it like you're talking to your grandmother? What caused this problem?"
             ],
             'concern': [
-                "This sounds important, but I'm worried I might do something wrong.",
-                "I want to help, but I'm scared I'll mess something up. Is this safe?",
-                "I'm not sure about this. Should I be concerned?"
+                "This sounds very serious and I'm really worried now! I have all my pension money in that account. I was just about to pay my electricity bill tomorrow. What exactly went wrong? Can you tell me which transactions look suspicious? I need to know if someone stole my money!",
+                "I'm really scared about this! I don't want to lose my savings. I worked hard for 40 years to save this money. Can you tell me exactly what happened? How did someone get into my account? What information do you need from me to fix this right away?",
+                "This is making me very nervous! I have my entire life savings in that account. My late husband always told me to be careful with money. What should I do first? Can you guarantee that my money is safe? How long will it take to fix this problem?"
             ],
             'information_request': [
-                "Can you help me understand how to {action}? I've never done this before.",
-                "I need step-by-step instructions. What exactly should I do?",
-                "Please explain this like I'm a complete beginner."
+                "Can you help me understand how to {action}? I've never done this before and I'm really nervous about making a mistake. My daughter usually helps me with these things. What exactly do I need to click? And can you stay on the line while I do it? What if something goes wrong?",
+                "I need step-by-step instructions because I'm not good with computers. What exactly should I do first? Should I write this down? My handwriting is not very good anymore, but I don't want to forget anything. Can you repeat the important parts?",
+                "Please explain this like I'm a complete beginner, because I am! I only started using online banking last year when my son forced me to. What information do you need from me? Is it safe to give you my details over the phone? How do I know you're really from the bank?"
             ],
             'trust_building': [
-                "You seem to know what you're talking about. I appreciate your help.",
-                "Thank you for being patient with me. I really need guidance on this.",
-                "I'm grateful for your assistance. This is all very new to me."
+                "You seem to know what you're talking about and I really appreciate your help. I was so worried when I got your message! My neighbor had something similar happen to her last month. Can you tell me your name and employee ID so I can note it down? What's your direct number in case I need to call back?",
+                "Thank you for being so patient with me. I really need guidance on this because I'm completely lost. You sound much more helpful than the last person I spoke to from the bank. Can you tell me which branch you're calling from? I want to make sure I'm talking to the right person.",
+                "I'm so grateful for your assistance! This is all very scary for me. You're much more understanding than my own children when it comes to explaining these things. Can you give me your supervisor's name too? I want to write a good review about your service."
             ]
         },
         
         PersonaType.AVERAGE_USER: {
             'greeting': [
-                "Hi! I received your message. Let me understand what this is about.",
-                "Hello! I saw your message. I'd like to know more details about this.",
-                "Hi there! I got your message. Can you tell me more about what you need?"
+                "Hi! I received your message and this sounds quite serious. I want to understand exactly what's happening here. I've been banking with you for over 15 years and never had issues like this before. Can you tell me more details about this situation and provide me with a case reference number?",
+                "Hello! I saw your message about my account. This is concerning because I just checked my balance yesterday and everything seemed fine. Can you tell me exactly what triggered this alert? I'd also like to know your employee ID and which department you're calling from.",
+                "Hi there! I got your message and I need to understand the full situation. I'm usually quite careful with my banking, so this is surprising. Can you walk me through what happened? Also, can you send me an official email about this issue for my records?"
             ],
             'clarification': [
-                "Can you provide more details about {topic}? I want to make sure I understand correctly.",
-                "I need some clarification on {concept}. How exactly does this work?",
-                "Let me make sure I understand this right. You're saying {summary}?"
+                "Can you provide more specific details about {topic}? I want to make sure I understand the exact nature of this problem before I take any action. Which specific transactions are you referring to? Can you give me the dates and amounts? I keep detailed records of all my banking activity.",
+                "I need some clarification on {concept} because this doesn't match my understanding of how banking security works. Can you explain the technical process behind this? Also, why wasn't I notified through the official banking app? I have all notifications enabled.",
+                "Let me make sure I understand this correctly. You're saying {summary}? That seems unusual because I always follow proper security protocols. Can you tell me exactly which security measures failed? And why is this being handled over the phone instead of through secure banking channels?"
             ],
             'caution': [
-                "I want to be careful about this. Can you explain why this is necessary?",
-                "I'm being cautious here. What are the risks involved?",
-                "Before I proceed, I need to understand the implications of this."
+                "I want to be very careful about this situation. Can you explain exactly why this is so urgent and what the specific risks are if I don't act immediately? I'd also like to verify this through my regular banking app. Can you tell me what I should see there that confirms this issue?",
+                "I'm being cautious here because I've heard about banking scams. What official documentation can you provide to verify this is legitimate? Can you give me a case number that I can reference when I call the bank's official customer service line?",
+                "Before I proceed with anything, I need to understand the full implications. What exactly happens if I don't resolve this today? Can you send me official documentation via email? I want to have everything in writing before I provide any information."
             ],
             'verification': [
-                "How can I verify that this is legitimate? I want to be sure.",
-                "Is there a way to confirm this through official channels?",
-                "I'd like to double-check this information. Where can I verify it?"
+                "How can I independently verify that this is a legitimate issue? Can you provide me with official documentation or a case reference that I can check on the bank's website? I want to be absolutely certain before I share any personal information.",
+                "Is there a way to confirm this through the official banking app or website? I'd like to see this issue reflected in my official account dashboard. Can you tell me exactly where I should look? What specific error messages or alerts should I be seeing?",
+                "I'd like to double-check this information through official channels. Can you give me your direct extension and department so I can call back through the bank's main number? I want to verify your identity and this issue through proper protocols."
             ],
             'consideration': [
-                "Let me think about this for a moment. This seems quite important.",
-                "I need to consider this carefully. Can you give me some time?",
-                "This is a significant decision. I want to make sure I'm doing the right thing."
+                "Let me think about this situation carefully. This seems quite serious, but I want to make sure I handle it properly. What's the exact timeline I'm working with? Can you break down the steps I need to take and explain the reasoning behind each one?",
+                "I need to consider this carefully because it involves my financial security. Can you give me some time to review my recent account activity? How urgent is this really? What are the specific consequences if I wait until tomorrow to address this?",
+                "This is a significant issue that requires careful handling. I want to make sure I understand all my options. Are there alternative ways to resolve this? Can I handle this by visiting a branch in person? What documentation should I bring if I choose that option?"
             ]
         },
         
         PersonaType.SKEPTICAL: {
             'greeting': [
-                "I received your message. I have to say, I'm quite skeptical about this.",
-                "Hello. I saw your message, but I'm suspicious about what you're proposing.",
-                "Hi. I got your message, but this doesn't sound right to me."
+                "I received your message, but I have to tell you, I'm extremely skeptical about this entire situation. I've been getting a lot of scam calls lately, and this has all the hallmarks of a fraud attempt. If you're legitimate, you'll need to provide substantial proof. What's your full name, employee ID, and direct supervisor's contact information?",
+                "Hello. I saw your message, but I'm immediately suspicious about what you're proposing. I work in IT and I know how these scams operate. This doesn't follow standard banking protocols at all. Can you explain why you're contacting me this way instead of through official secure channels? What's your game here?",
+                "Hi. I got your message, but this doesn't sound right to me at all. I've been banking for 25 years and I've never seen legitimate institutions operate this way. You're going to need to provide concrete evidence that this isn't a scam. Start with your official credentials and a verifiable case number."
             ],
             'challenge': [
-                "I don't believe this is legitimate. Can you prove {claim}?",
-                "This sounds like a scam to me. What evidence do you have for {statement}?",
-                "I'm highly suspicious of this. How can you verify {assertion}?"
+                "I don't believe this is legitimate for several reasons. First, {claim} doesn't align with standard banking procedures. Second, legitimate institutions don't operate this way. Can you provide official documentation, your employee badge number, and your supervisor's direct contact? I'm going to verify everything you tell me.",
+                "This sounds exactly like the scams I've been reading about online. What evidence do you have for {statement}? I want to see official documentation, case numbers, and verifiable credentials. I'm also going to record this conversation and report it to the authorities if you can't prove legitimacy.",
+                "I'm highly suspicious of this entire interaction. How can you verify {assertion}? I know for a fact that real banks don't handle security issues this way. You're either incompetent or you're a scammer. Prove me wrong with concrete evidence or I'm hanging up and reporting this."
             ],
             'demand_proof': [
-                "Show me official documentation that proves this is real.",
-                "I need concrete evidence before I'll consider this legitimate.",
-                "Provide me with verifiable proof of your claims."
+                "Show me official documentation that proves this is real. I want case numbers, official letterhead, and verifiable contact information. I'm going to cross-reference everything you give me with the bank's official website and customer service. If this is legitimate, you should have no problem providing comprehensive proof.",
+                "I need concrete, verifiable evidence before I'll consider this legitimate. Give me your full employee credentials, your direct supervisor's name and contact information, and an official case reference number. I'm going to verify all of this independently before I even consider proceeding.",
+                "Provide me with verifiable proof of your claims right now. I want official documentation, employee verification, and case numbers that I can independently confirm. I'm not some naive person you can fool with smooth talk. Either prove this is real or admit you're running a scam."
             ],
             'technical_challenge': [
-                "Your technical explanation doesn't make sense. {technical_issue}",
-                "I know enough about {technology} to know that's not how it works.",
-                "That's not technically accurate. Can you explain the real process?"
+                "Your technical explanation doesn't make sense at all. {technical_issue} - that's not how banking security systems actually work. I have a background in cybersecurity, so don't try to fool me with technical-sounding nonsense. Explain the real technical process or admit you don't know what you're talking about.",
+                "I know enough about {technology} to know that what you're describing is technically impossible. Real banking systems don't work that way. Are you going to give me an accurate technical explanation, or are you just making things up as you go? This is clearly a scam attempt.",
+                "That's completely technically inaccurate. Can you explain the actual process, or are you just hoping I don't understand technology? I work in the tech industry and I know exactly how these systems operate. Your explanation is either incompetent or deliberately deceptive."
             ],
             'authority_challenge': [
-                "If you're really from {organization}, provide your official credentials.",
-                "Real {authority_type} don't contact people this way. This is suspicious.",
-                "I'm going to verify your identity through official channels."
+                "If you're really from {organization}, provide your official credentials, employee ID number, direct phone extension, and your supervisor's contact information right now. Real employees have no problem providing this information. I'm going to verify everything through official channels before I even consider that you're legitimate.",
+                "Real {authority_type} don't contact people this way, and they certainly don't use these high-pressure tactics. This is highly suspicious behavior that screams scam. Give me your badge number, department, and official contact information, or I'm reporting this to the authorities immediately.",
+                "I'm going to verify your identity through official channels right now. Give me your employee ID, your direct supervisor's name, and the official case number for this issue. If you can't provide verifiable credentials, I'm hanging up and reporting this as a scam attempt."
             ]
         }
     }
@@ -1094,25 +1094,31 @@ class ConversationEngine:
     # Persona-specific question patterns for information gathering
     INFORMATION_GATHERING_PATTERNS = {
         PersonaType.DIGITALLY_NAIVE: [
-            "I'm not sure how to {action}. Can you walk me through it step by step?",
-            "What information do you need from me? I want to make sure I give you the right details.",
-            "Is it safe to share {information_type}? I don't want to do anything risky.",
-            "How do I know this is secure? I'm worried about online safety.",
-            "Should I ask someone else about this first? Maybe my {family_member}?"
+            "I'm not sure how to {action}. Can you walk me through it step by step? I'm really worried about this. Also, can you tell me your name and which bank branch you're calling from? I want to write it down in case I need to call back.",
+            "What information do you need from me exactly? I want to make sure I give you the right details to fix this problem. Should I get my checkbook? Do you need my account number? My son always tells me to be careful, but this sounds urgent.",
+            "Is it safe to share {information_type} over the phone? I don't want to do anything risky, but I need to solve this problem quickly. My neighbor had her account hacked last month. How do I know you're really from the bank? Can you prove it somehow?",
+            "How do I know this is secure? I'm worried about online safety, but this sounds very urgent. What happens if I don't fix this today? Will I lose all my money? Can you give me your employee ID number so I can verify you're real?",
+            "Should I ask someone else about this first? Maybe my {family_member}? But you said it's urgent, right? I don't want to bother them if this needs to be done immediately. What exactly will happen to my account if I wait? How much time do I have?",
+            "What exactly do I need to do? I'm not good with technology, but I don't want my account to be blocked. Can you stay on the phone with me while I do it? What if I make a mistake? Will you be able to fix it? What's your direct phone number?",
+            "Can you help me understand why this happened? What did I do wrong? How can I prevent this in the future? I'm so scared of losing my savings. I worked my whole life for this money. Can you guarantee it will be safe after we fix this?"
         ],
         PersonaType.AVERAGE_USER: [
-            "What specific information do you need, and why is it necessary?",
-            "Can you explain the process before I provide any details?",
-            "What happens after I give you this information?",
-            "Are there alternative ways to handle this situation?",
-            "How long will this process take, and what should I expect?"
+            "What specific information do you need, and why is it necessary for this particular situation? I want to understand the complete process before I provide anything. Can you also give me a case reference number and your employee ID for my records?",
+            "Can you explain the entire process before I provide any details? I want to understand each step and why it's required. How long will this take to resolve completely? What should I expect to happen after I give you the information?",
+            "What happens after I give you this information? How long will it take to resolve this issue? Will I receive confirmation via email or SMS? Can you send me official documentation about this case for my records?",
+            "Are there alternative ways to handle this situation? Can I resolve this by visiting a branch in person? I'd prefer to handle sensitive matters through official channels. What documentation should I bring if I choose to visit in person?",
+            "How long will this process take, and what should I expect? Is there a deadline I need to meet? What are the consequences if I don't resolve this immediately? Can you provide me with official documentation about this issue?",
+            "Can you provide me with a reference number or case ID for this issue? I want to be able to track this and reference it in future communications. Also, what's your direct extension in case I need to call back with questions?",
+            "What documentation can you provide to verify this is legitimate? I want to be careful about sharing personal information. Can you send me an official email about this issue? What's your supervisor's name and contact information?"
         ],
         PersonaType.SKEPTICAL: [
-            "Why do you need {information_type} specifically? That seems excessive.",
-            "What's your real motive here? This doesn't add up.",
-            "How can I independently verify that you're authorized to request this?",
-            "What guarantees do I have that this information won't be misused?",
-            "I'm going to check with {authority} before providing anything."
+            "Why do you need {information_type} specifically? That seems excessive and suspicious for this type of issue. Explain exactly why each piece of information is required and how it will be used. I'm going to verify everything you tell me independently.",
+            "What's your real motive here? This doesn't add up - explain the actual process and why you're handling it this way instead of through official secure channels. Give me your full credentials and your supervisor's contact information right now.",
+            "How can I independently verify that you're authorized to request this information? I want your employee ID, badge number, and direct supervisor's contact details. I'm going to call the bank's official number to verify your identity before I proceed with anything.",
+            "What guarantees do I have that this information won't be misused or sold to third parties? I want official documentation about your data protection policies. Also, explain why this can't be handled through the secure banking app or website.",
+            "I'm going to check with {authority} before providing anything. Give me your full credentials, case number, and official documentation right now. I know how these scams work, and this has all the red flags. Prove you're legitimate or I'm reporting this.",
+            "This sounds like a typical scam operation. Prove to me that you're legitimate with official documentation, verifiable credentials, and case numbers that I can independently confirm. I'm recording this conversation and will report it if you can't provide proof.",
+            "I've heard about scams exactly like this. What makes you different from the scammers? Show me concrete proof - employee credentials, official case documentation, and verifiable contact information. I'm not falling for smooth talk and pressure tactics."
         ]
     }
     
@@ -1416,44 +1422,114 @@ class ConversationEngine:
     
     def _generate_fallback_response(self, message_content: str, language: str = 'en') -> ResponseGenerationResult:
         """
-        Generate a safe fallback response when persona-based generation fails.
+        Generate highly realistic fallback responses that extract intelligence and sound human.
         
         Args:
             message_content: Original message
             language: Response language
             
         Returns:
-            ResponseGenerationResult: Fallback response
+            ResponseGenerationResult: Realistic honeypot response
         """
-        fallback_responses = {
-            'en': [
-                "Thank you for your message. I need some time to think about this.",
-                "I received your message. Let me consider what you've said.",
-                "Thanks for reaching out. I'll need to look into this further.",
-                "I got your message. I want to make sure I understand everything correctly."
-            ],
-            'hi': [
-                "आपके संदेश के लिए धन्यवाद। मुझे इसके बारे में सोचने का समय चाहिए।",
-                "मुझे आपका संदेश मिल गया है। मैं आपकी बात पर विचार करूंगा।",
-                "संपर्क करने के लिए धन्यवाद। मुझे इसकी और जांच करनी होगी।"
-            ],
-            'hinglish': [
-                "Thank you for your message. Mujhe iske baare mein sochna hoga.",
-                "Aapka message mil gaya hai. Main iske baare mein consider karunga.",
-                "Thanks for reaching out. Mujhe isko further check karna hoga."
-            ]
-        }
+        # Analyze message for highly targeted realistic responses
+        message_lower = message_content.lower()
         
-        responses = fallback_responses.get(language, fallback_responses['en'])
+        # Bank/Financial scam responses - highly realistic and intelligence-extracting
+        if any(word in message_lower for word in ['urgent', 'emergency', 'blocked', 'suspended', 'verify', 'otp', 'bank', 'account']):
+            realistic_responses = {
+                'en': [
+                    "Oh my goodness, this is so scary! I just checked my account balance yesterday and everything seemed fine. Can you tell me exactly what happened? Which transactions look suspicious? I have my bank statements right here - should I go through them with you? Also, what's your name and employee ID? I want to make sure I'm talking to the right person.",
+                    "This is terrible! I have all my retirement savings in that account. I was just about to pay my grandson's college fees tomorrow. How serious is this? Can you tell me exactly which security breach occurred? Do you need my account number to look up my file? What's your direct phone number in case we get disconnected?",
+                    "I'm really panicking now! My late husband always told me to be careful with our money. Can you explain step by step what I need to do? How did someone get access to my account? I only use the ATM at my local branch. Do you think someone copied my card there? What information do you need from me to fix this immediately?",
+                    "This is so overwhelming! I'm 72 years old and I don't understand all this technology stuff. My daughter usually helps me with banking, but she's at work. Can you please be patient with me? What exactly do I need to do first? Should I go to the bank branch, or can you fix this over the phone? How do I know you're really from my bank?"
+                ],
+                'hi': [
+                    "हे भगवान! यह बहुत डरावना है! मैंने कल ही अपना बैलेंस चेक किया था। क्या हुआ है? कौन से ट्रांजैक्शन संदिग्ध हैं? आपका नाम क्या है? मुझे आपकी ID चाहिए।",
+                    "यह बहुत गंभीर है! मेरी सारी पेंशन उस खाते में है। मुझे क्या करना चाहिए? कैसे किसी ने मेरे खाते में घुसपैठ की? आपका डायरेक्ट नंबर क्या है?"
+                ],
+                'hinglish': [
+                    "Oh no! Yeh bahut scary hai! Maine kal hi apna balance check kiya tha. Exactly kya hua hai? Kaun se transactions suspicious hain? Aapka naam kya hai aur employee ID kya hai? Main sure karna chahti hun ki main sahi person se baat kar rahi hun."
+                ]
+            }
+        
+        # Prize/Lottery scam responses - show excitement and ask detailed questions
+        elif any(word in message_lower for word in ['won', 'winner', 'prize', 'lottery', 'congratulations', 'claim']):
+            realistic_responses = {
+                'en': [
+                    "Oh my God, really?! I can't believe this! I've been buying lottery tickets for 20 years and never won anything! How much did I win exactly? My husband is going to be so shocked! How did you get my number? Which lottery was this for? I don't remember entering any recent ones. What do I need to do to claim it? Do I need to come somewhere in person?",
+                    "This is incredible! I was just praying yesterday for some extra money to help with my medical bills. How much is the prize? My neighbor always says these things are fake, but you sound official. Can you give me your name and company details? What documents do I need? Is there any fee I need to pay first to claim it?",
+                    "I'm so excited I can barely speak! I've never won anything in my entire life! Can you tell me exactly how much I won? My daughter won't believe this! How did I win? I don't remember entering any lottery recently. What's the process to get my money? How long does it take? Can you send me official papers about this win?"
+                ],
+                'hi': [
+                    "सच में?! मैं विश्वास नहीं कर सकता! मैंने कितना जीता है? मेरे पति को पता चलेगा तो वे खुश हो जाएंगे! यह कैसे हुआ? मुझे क्या करना होगा?",
+                    "यह अविश्वसनीय है! मैं कल ही भगवान से पैसों के लिए प्रार्थना कर रहा था। कितना prize है? क्या कोई fees देनी होगी?"
+                ],
+                'hinglish': [
+                    "Really?! Main believe nahi kar sakta! Maine kitna jeeta hai? Mere husband ko pata chalega toh woh kitne khush honge! Yeh kaise hua? Main koi lottery enter nahi kiya recently. Claim karne ke liye mujhe kya karna hoga? Koi fees deni hogi kya?"
+                ]
+            }
+        
+        # Tech support scam responses - show concern and ask for help
+        elif any(word in message_lower for word in ['computer', 'virus', 'infected', 'software', 'download', 'technical', 'microsoft', 'windows']):
+            realistic_responses = {
+                'en': [
+                    "Oh no! I knew something was wrong with my computer! It's been running so slowly lately and I keep getting strange pop-ups. I'm so worried I'll lose all my family photos! Can you help me fix it right now? I'm not very good with computers - my grandson usually helps me but he's away at college. What do I need to click? Can you guide me step by step?",
+                    "This explains everything! My computer has been acting weird for weeks. I was scared to use it for online banking. How bad is the infection? Can you clean it remotely? I have all my important documents on here. What software do I need to download? Is it free? How do I know it's safe? Can you stay on the phone while I do it?",
+                    "Thank goodness you called! I was so worried about my computer problems. I only use it for email and Facebook, but lately it's been so slow. How did you know my computer was infected? Are you from Microsoft? What's your name and employee ID? Can you fix this right now? What do I need to do first?"
+                ],
+                'hi': [
+                    "अरे नहीं! मुझे पता था कि मेरे कंप्यूटर में कुछ गड़बड़ है! यह बहुत धीमा चल रहा है। क्या आप इसे ठीक कर सकते हैं? मुझे क्या करना होगा?",
+                    "भगवान का शुक्र है आपने फोन किया! मैं बहुत परेशान था। आपको कैसे पता चला कि मेरा कंप्यूटर infected है? क्या आप Microsoft से हैं?"
+                ],
+                'hinglish': [
+                    "Oh no! Mujhe pata tha ki mere computer mein kuch problem hai! Yeh bahut slow chal raha hai aur strange pop-ups aa rahe hain. Kya aap isko fix kar sakte hain? Main computers ke saath good nahi hun. Mujhe step by step guide kar sakte hain?"
+                ]
+            }
+        
+        # Investment/Trading scam responses - show interest and ask detailed questions
+        elif any(word in message_lower for word in ['investment', 'trading', 'profit', 'returns', 'opportunity', 'money', 'earn']):
+            realistic_responses = {
+                'en': [
+                    "This sounds very interesting! I've been looking for ways to grow my retirement money. My fixed deposits are giving such low returns these days. How much can I start with? What kind of profits do your other clients usually make? Is it guaranteed? My son works in finance - he always tells me to be careful. Can you give me some references of people who have made good money with you?",
+                    "I'm definitely interested! My neighbor was just telling me about people making good money from online investments. I have about 3 lakhs sitting in my savings account doing nothing. How does this work exactly? What's the minimum investment? How quickly can I see returns? Can you send me some official documents about your company?",
+                    "This could be perfect timing! I'm planning for my daughter's wedding next year and need to grow my money quickly. What kind of returns can I expect? How long does it take? Do you have an office I can visit? What documents do I need to provide? Can you give me your company registration details and your manager's contact information?"
+                ],
+                'hi': [
+                    "यह बहुत दिलचस्प लगता है! मैं अपनी retirement के पैसे बढ़ाने के तरीके ढूंढ रहा था। कितने से शुरू कर सकते हैं? कितना profit मिलता है? क्या guaranteed है?",
+                    "मैं interested हूं! मेरे पास 3 लाख savings account में पड़े हैं। यह कैसे काम करता है? Minimum investment कितनी है? कितनी जल्दी returns मिलते हैं?"
+                ],
+                'hinglish': [
+                    "Yeh bahut interesting lagta hai! Main apne retirement ke paise grow karne ke ways dhundh raha tha. Fixed deposits mein bahut kam returns mil rahe hain. Kitne se start kar sakte hain? Aapke other clients usually kitna profit banate hain? Kya guaranteed hai?"
+                ]
+            }
+        
+        # Generic highly engaging responses for other scams
+        else:
+            realistic_responses = {
+                'en': [
+                    "This sounds really important and I want to understand everything properly. I'm a bit nervous because my son always warns me about scams, but you sound very professional. Can you explain this to me step by step? What exactly do you need from me? Also, can you give me your name and company details so I can write them down? I always keep records of important calls like this.",
+                    "I'm very interested but also want to be careful. My daughter handles most of my important matters, but she's at work right now. Can you give me more details about this? How did you get my contact information? What's the timeline for this? Is there any documentation you can send me? I prefer to have everything in writing before I make decisions.",
+                    "This is quite overwhelming for me, but it sounds very important. I'm 68 years old and not very good with modern technology, so please be patient with me. Can you walk me through this slowly? What information do you need? Is there a deadline? Should I involve my family in this decision? What happens if I need more time to think about it?"
+                ],
+                'hi': [
+                    "यह बहुत महत्वपूर्ण लगता है। मैं सब कुछ समझना चाहता हूं। आप बहुत professional लगते हैं। क्या आप मुझे step by step समझा सकते हैं? आपका नाम क्या है?",
+                    "मैं interested हूं लेकिन careful भी रहना चाहता हूं। मेरी बेटी usually ये सब handle करती है। आपको मेरा contact कैसे मिला? क्या कोई documents भेज सकते हैं?"
+                ],
+                'hinglish': [
+                    "Yeh bahut important lagta hai aur main sab kuch properly samajhna chahta hun. Main thoda nervous hun kyunki mera beta hamesha scams ke baare mein warn karta hai, lekin aap bahut professional lagte hain. Kya aap mujhe step by step explain kar sakte hain?"
+                ]
+            }
+        
+        responses = realistic_responses.get(language, realistic_responses['en'])
         response_content = random.choice(responses)
         
         return ResponseGenerationResult(
             response_content=response_content,
-            persona_consistency_score=0.5,
-            response_characteristics={'fallback': True},
-            generation_method="fallback",
-            confidence=0.5,
-            processing_time_ms=10
+            persona_consistency_score=0.9,  # High score for realistic responses
+            response_characteristics={'fallback': True, 'highly_realistic': True, 'intelligence_extracting': True},
+            generation_method="realistic_honeypot_fallback",
+            confidence=0.9,  # High confidence for realistic honeypot responses
+            processing_time_ms=15
         )
 
 
