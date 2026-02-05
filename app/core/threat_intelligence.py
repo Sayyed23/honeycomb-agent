@@ -1058,9 +1058,9 @@ class TemporalAnalyzer:
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=lookback_days)
             
-            async with get_db_session() as db_session:
+            with SessionLocal() as db_session:
                 # Get sessions with high risk scores
-                result = await db_session.execute(
+                result = db_session.execute(
                     select(Session)
                     .where(Session.created_at >= cutoff_date)
                     .where(Session.risk_score >= 0.7)
@@ -1361,8 +1361,8 @@ class ThreatIntelligenceEngine:
             # Get high-risk sessions for analysis
             cutoff_date = datetime.utcnow() - timedelta(days=lookback_days)
             
-            async with get_db_session() as db_session:
-                result = await db_session.execute(
+            with SessionLocal() as db_session:
+                result = db_session.execute(
                     select(Session.session_id)
                     .where(Session.created_at >= cutoff_date)
                     .where(Session.risk_score >= 0.8)
