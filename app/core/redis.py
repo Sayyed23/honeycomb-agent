@@ -29,29 +29,31 @@ class RedisConnectionManager:
         self.client: Optional[redis.Redis] = None
     
     async def initialize(self) -> None:
-        """Initialize Redis connection pool and client."""
+        """Initialize Redis connection pool and client. Does not block startup on failure."""
         try:
-            # Create connection pool
+            # Create connection pool (short timeout so startup is not blocked when Redis is unavailable)
+            connect_timeout = min(2, settings.redis.socket_connect_timeout)
             self.pool = ConnectionPool.from_url(
                 settings.redis.url,
                 max_connections=settings.redis.max_connections,
                 socket_timeout=settings.redis.socket_timeout,
-                socket_connect_timeout=settings.redis.socket_connect_timeout,
+                socket_connect_timeout=connect_timeout,
                 retry_on_timeout=settings.redis.retry_on_timeout,
-                decode_responses=True,  # Automatically decode responses to strings
+                decode_responses=True,
                 encoding='utf-8'
             )
-            
-            # Create Redis client
             self.client = redis.Redis(connection_pool=self.pool)
-            
-            # Test connection
-            await self.client.ping()
+            # Short timeout for ping so Railway healthcheck can pass quickly when Redis is down
+            await asyncio.wait_for(self.client.ping(), timeout=2.0)
             logger.info("Redis connection initialized successfully")
-            
+        except asyncio.TimeoutError:
+            logger.warning("Redis connection timed out during startup (non-fatal)")
+            self.client = None
+            self.pool = None
         except Exception as e:
-            logger.error(f"Failed to initialize Redis connection: {e}")
-            raise
+            logger.warning("Redis unavailable at startup (non-fatal): %s", e)
+            self.client = None
+            self.pool = None
     
     async def close(self) -> None:
         """Close Redis connection and cleanup resources."""
