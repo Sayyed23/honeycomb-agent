@@ -24,7 +24,7 @@ import json
 from app.core.logging import get_logger
 from app.core.audit_logger import audit_logger
 from app.database.models import Session, Message, ExtractedEntity, RiskAssessment
-from app.database.connection import get_db
+from app.database.connection import SessionLocal
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import selectinload
 
@@ -392,15 +392,10 @@ class ConversationAnalyzer:
             # Simplified conversation analysis (no database dependency)
             logger.info(f"Analyzing conversation for session {session_id}")
             
-            # Mock conversation data for now
-            conversation_data = {
-                'session_id': session_id,
-                'messages': [],
-                'entities': [],
-                'risk_assessments': []
-            }
+            # Get session logic
+            with SessionLocal() as db_session:
                 # Get session with messages and entities
-                result = await db_session.execute(
+                result = db_session.execute(
                     select(Session)
                     .options(
                         selectinload(Session.messages),
@@ -644,9 +639,9 @@ class NetworkAnalyzer:
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=lookback_days)
             
-            async with get_db_session() as db_session:
+            with SessionLocal() as db_session:
                 # Get entities from recent sessions
-                result = await db_session.execute(
+                result = db_session.execute(
                     select(ExtractedEntity, Session.session_id)
                     .join(Session, ExtractedEntity.session_id == Session.id)
                     .where(Session.created_at >= cutoff_date)
@@ -791,9 +786,9 @@ class GeographicAnalyzer:
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=lookback_days)
             
-            async with get_db_session() as db_session:
+            with SessionLocal() as db_session:
                 # Get sessions with metadata containing IP information
-                result = await db_session.execute(
+                result = db_session.execute(
                     select(Session, Message)
                     .join(Message, Session.id == Message.session_id)
                     .where(Session.created_at >= cutoff_date)
