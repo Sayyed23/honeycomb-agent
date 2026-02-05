@@ -31,6 +31,7 @@ test_request_full = {
 # API configuration
 API_KEY = "iR3PgIodG2xKOCsKa7eNK6HrVKMNHOpzQmfDD6wPs"
 BASE_URLS = [
+    "http://1-production-fc5b.up.railway.app",
     "https://jt-production-fc5b.up.railway.app",
     "http://localhost:8000"  # Fallback for local testing
 ]
