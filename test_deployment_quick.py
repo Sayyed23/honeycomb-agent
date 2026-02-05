@@ -11,7 +11,7 @@ import concurrent.futures
 from datetime import datetime
 
 # Configuration
-BASE_URL = "http://1-production-fc5b.up.railway.app"
+BASE_URL = "https://1-production-fc5b.up.railway.app"
 API_KEY = "iR3PgIodG2xKOCsKa7eNK6HrVKMNHOpzQmfDD6wPs"
 
 def test_single_request(session_id: str, message: str) -> dict:

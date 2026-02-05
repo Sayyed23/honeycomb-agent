@@ -8,6 +8,7 @@ import json
 
 # Possible URLs to try
 POSSIBLE_URLS = [
+    "https://1-production-fc5b.up.railway.app",
     "http://1-production-fc5b.up.railway.app",
 ]
 
