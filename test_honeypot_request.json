@@ -1,0 +1,14 @@
+{
+  "sessionId": "test-session-123",
+  "message": {
+    "sender": "scammer",
+    "text": "Hello, I am calling from your bank. There is a problem with your account.",
+    "timestamp": "2024-02-04T15:59:00Z"
+  },
+  "conversationHistory": [],
+  "metadata": {
+    "channel": "web",
+    "language": "en",
+    "locale": "en-US"
+  }
+}

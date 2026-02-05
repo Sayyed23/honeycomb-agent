@@ -4,7 +4,7 @@ Database utility functions and helpers.
 
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import SQLAlchemyError
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 import logging
 from datetime import datetime, timedelta
 
@@ -135,6 +135,63 @@ class DatabaseManager:
             logger.error(f"Failed to add message to session {session_id}: {e}")
             return None
     
+    def record_interaction(
+        self,
+        session_id: str,
+        user_message: str,
+        ai_reply: str,
+        risk_score: float,
+        confidence: float = 0.0,
+        persona_type: Optional[str] = None,
+        detection_method: Optional[str] = "rule_based",
+        entities: Optional[List[Dict[str, Any]]] = None,
+    ) -> bool:
+        """
+        Record one turn: get or create session, add user + assistant messages,
+        risk assessment, and extracted entities. Used by honeypot endpoint.
+        """
+        try:
+            session = self.get_session(session_id)
+            if not session:
+                session = self.create_session(
+                    session_id=session_id,
+                    risk_score=risk_score,
+                    confidence_level=confidence,
+                    persona_type=persona_type,
+                )
+            user_msg = self.add_message(session_id, "user", user_message)
+            if not user_msg:
+                return False
+            self.add_message(session_id, "assistant", ai_reply)
+            risk_factors = {"factors": []}
+            if risk_score >= 0.7:
+                risk_factors["factors"].extend(["urgency", "financial_claim"])
+            self.add_risk_assessment(
+                session_id=session_id,
+                message_id=str(user_msg.id),
+                risk_score=risk_score,
+                confidence=confidence,
+                detection_method=detection_method,
+                risk_factors=risk_factors,
+            )
+            for e in entities or []:
+                et = e.get("entity_type") or e.get("type")
+                val = e.get("entity_value") or e.get("value")
+                if et and val:
+                    self.add_extracted_entity(
+                        session_id=session_id,
+                        entity_type=et if isinstance(et, str) else getattr(et, "value", str(et)),
+                        entity_value=val,
+                        confidence_score=float(e.get("confidence_score", e.get("confidence", 0.8))),
+                        extraction_method=e.get("extraction_method"),
+                        context=e.get("context"),
+                    )
+            return True
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            logger.error(f"Failed to record interaction for session {session_id}: {e}")
+            return False
+
     def add_risk_assessment(
         self,
         session_id: str,

@@ -39,7 +39,7 @@ class ComponentHealth:
     async def check_database() -> bool:
         """Check database connectivity."""
         try:
-            return await check_database_health()
+            return check_database_health()
         except Exception as e:
             logger.error(f"Database health check failed: {e}")
             return False

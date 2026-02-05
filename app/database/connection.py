@@ -2,12 +2,10 @@
 Database connection management and session handling.
 """
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session as SQLAlchemySession
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import QueuePool
-from typing import Generator, AsyncGenerator
-from contextlib import asynccontextmanager
+from typing import Generator
 import logging
 
 from config.settings import settings
@@ -21,11 +19,6 @@ if settings.database.url.startswith("sqlite"):
         settings.database.url,
         echo=settings.database.echo,
         connect_args={"check_same_thread": False}
-    )
-    # For async operations with SQLite
-    async_engine = create_async_engine(
-        settings.database.url.replace("sqlite://", "sqlite+aiosqlite://"),
-        echo=settings.database.echo
     )
 else:
     # PostgreSQL configuration for production
@@ -44,17 +37,6 @@ else:
             "application_name": "honeypot_api",  # Application name for monitoring
         }
     )
-    # For async operations with PostgreSQL
-    async_engine = create_async_engine(
-        settings.database.url.replace("postgresql://", "postgresql+asyncpg://"),
-        echo=settings.database.echo,
-        poolclass=QueuePool,
-        pool_size=settings.database.pool_size,
-        max_overflow=settings.database.max_overflow,
-        pool_timeout=settings.database.pool_timeout,
-        pool_recycle=settings.database.pool_recycle,
-        pool_pre_ping=True
-    )
 
 # Create session factory
 SessionLocal = sessionmaker(
@@ -62,15 +44,6 @@ SessionLocal = sessionmaker(
     autoflush=False,
     bind=engine,
     expire_on_commit=False  # Keep objects accessible after commit
-)
-
-# Create async session factory
-AsyncSessionLocal = async_sessionmaker(
-    bind=async_engine,
-    class_=AsyncSession,
-    autocommit=False,
-    autoflush=False,
-    expire_on_commit=False
 )
 
 
@@ -98,31 +71,7 @@ def get_db() -> Generator[SQLAlchemySession, None, None]:
         db.close()
 
 
-@asynccontextmanager
-async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
-    """
-    Async context manager for database sessions.
-    
-    Yields:
-        AsyncSession: Async database session instance
-        
-    Usage:
-        async with get_db_session() as db:
-            # Use async db session here
-            result = await db.execute(query)
-    """
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        except Exception as e:
-            logger.error(f"Async database session error: {e}")
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
-
-
-async def check_database_health() -> bool:
+def check_database_health() -> bool:
     """
     Check database connectivity and health.
     
@@ -132,7 +81,6 @@ async def check_database_health() -> bool:
     try:
         db = SessionLocal()
         # Simple query to test connection
-        from sqlalchemy import text
         db.execute(text("SELECT 1"))
         db.close()
         return True

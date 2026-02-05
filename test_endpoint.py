@@ -2,7 +2,8 @@
 import requests
 import json
 
-url = "https://vertie-subcerebellar-pok.ngrok-free.dev/api/honeypot"
+# url = "https://vertie-subcerebellar-pok.ngrok-free.dev/api/honeypot"
+url = "https://1-production-fc5b.up.railway.app/api/honeypot"
 headers = {
     "x-api-key": "iR3Prglodfd2xKOCsKa7eNK6kFVKMNHOpzQmfDD6wPs",
     "Content-Type": "application/json"

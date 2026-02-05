@@ -3,7 +3,8 @@ Main FastAPI application entry point.
 Agentic Honeypot API for Scam Detection & Intelligence Extraction.
 """
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
@@ -51,6 +52,20 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["x-api-key", "content-type"],
 )
+
+
+@app.get("/")
+async def root():
+    """Root route so base URL returns a helpful message instead of Not Found."""
+    return {
+        "app": settings.app_name,
+        "version": settings.app_version,
+        "status": "running",
+        "endpoints": {
+            "health": "GET /health",
+            "honeypot": "POST /api/honeypot (header: x-api-key)",
+        },
+    }
 
 
 @app.middleware("http")
@@ -135,18 +150,30 @@ async def add_request_logging_and_metrics(request: Request, call_next):
     return response
 
 
-@app.middleware("http")
-async def log_request_body(request: Request, call_next):
-    """Log request body for debugging."""
-    if request.url.path == "/api/honeypot" and request.method == "POST":
-        try:
-            body = await request.body()
-            logger.info(f"Incoming Request Body: {body.decode()}")
-        except Exception as e:
-            logger.error(f"Failed to log body: {e}")
-            
-    response = await call_next(request)
-    return response
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Exception handler for validation errors."""
+    return JSONResponse(
+        status_code=422,
+        content={
+            "status": "error",
+            "message": "Invalid request schema",
+            "details": exc.errors()
+        }
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Exception handler for HTTP exceptions."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "status": "error",
+            "message": exc.detail
+        },
+        headers=exc.headers
+    )
 
 
 @app.exception_handler(Exception)

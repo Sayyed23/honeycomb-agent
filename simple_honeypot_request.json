@@ -1,0 +1,5 @@
+{
+  "sessionId": "test-session-123",
+  "message": "Hello, I am calling from your bank. There is a problem with your account.",
+  "conversationHistory": []
+}
