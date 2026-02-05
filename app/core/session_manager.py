@@ -468,9 +468,14 @@ class SessionManager:
                     break
                 except Exception as e:
                     logger.error(f"Error in session cleanup task: {e}")
+                    # Continue running even if cleanup fails
         
-        self._cleanup_task = asyncio.create_task(cleanup_loop())
-        logger.info(f"Started session cleanup task with {interval_minutes} minute interval")
+        try:
+            self._cleanup_task = asyncio.create_task(cleanup_loop())
+            logger.info(f"Started session cleanup task with {interval_minutes} minute interval")
+        except Exception as e:
+            logger.error(f"Failed to start session cleanup task: {e}")
+            raise
     
     async def stop_cleanup_task(self) -> None:
         """Stop background cleanup task."""

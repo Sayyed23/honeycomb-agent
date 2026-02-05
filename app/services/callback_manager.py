@@ -35,9 +35,14 @@ class CallbackManager:
             logger.warning("Callback manager is already running")
             return
         
-        self.is_running = True
-        self.retry_task = asyncio.create_task(self._retry_loop())
-        logger.info("Callback manager background tasks started")
+        try:
+            self.is_running = True
+            self.retry_task = asyncio.create_task(self._retry_loop())
+            logger.info("Callback manager background tasks started")
+        except Exception as e:
+            self.is_running = False
+            logger.error(f"Failed to start callback manager background tasks: {e}")
+            raise
     
     async def stop_background_tasks(self):
         """Stop background tasks."""

@@ -31,20 +31,20 @@ class RedisConnectionManager:
     async def initialize(self) -> None:
         """Initialize Redis connection pool and client. Does not block startup on failure."""
         try:
-            # Create connection pool (short timeout so startup is not blocked when Redis is unavailable)
-            connect_timeout = min(2, settings.redis.socket_connect_timeout)
+            # Create connection pool (very short timeout so startup is not blocked when Redis is unavailable)
+            connect_timeout = 1  # Very short timeout for Railway
             self.pool = ConnectionPool.from_url(
                 settings.redis.url,
                 max_connections=settings.redis.max_connections,
-                socket_timeout=settings.redis.socket_timeout,
+                socket_timeout=2,  # Short socket timeout
                 socket_connect_timeout=connect_timeout,
-                retry_on_timeout=settings.redis.retry_on_timeout,
+                retry_on_timeout=False,  # Don't retry on timeout during startup
                 decode_responses=True,
                 encoding='utf-8'
             )
             self.client = redis.Redis(connection_pool=self.pool)
-            # Short timeout for ping so Railway healthcheck can pass quickly when Redis is down
-            await asyncio.wait_for(self.client.ping(), timeout=2.0)
+            # Very short timeout for ping so Railway healthcheck can pass quickly when Redis is down
+            await asyncio.wait_for(self.client.ping(), timeout=1.0)
             logger.info("Redis connection initialized successfully")
         except asyncio.TimeoutError:
             logger.warning("Redis connection timed out during startup (non-fatal)")

@@ -10,6 +10,8 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 import time
 import uuid
+import asyncio
+import os
 from datetime import datetime
 from typing import Dict, Any
 
@@ -66,6 +68,12 @@ async def root():
             "honeypot": "POST /api/honeypot (header: x-api-key)",
         },
     }
+
+
+@app.get("/ready")
+async def readiness_check():
+    """Simple readiness check for Railway health checks."""
+    return {"status": "ready", "timestamp": datetime.utcnow().isoformat()}
 
 
 @app.middleware("http")
@@ -216,6 +224,10 @@ app.include_router(guvi_callback.router, tags=["GUVI Callbacks"])
 @app.on_event("startup")
 async def startup_event():
     """Application startup event."""
+    # Log environment info for debugging
+    port = os.getenv('PORT', '8000')
+    environment = os.getenv('ENVIRONMENT', 'production')
+    
     logger.info(
         "Application starting up",
         extra={
@@ -223,30 +235,41 @@ async def startup_event():
             "version": settings.app_version,
             "environment": settings.environment,
             "debug": settings.debug,
+            "host": settings.host,
+            "port": settings.port,
+            "env_port": port,
+            "env_environment": environment,
         }
     )
     
-    # Initialize Redis connection
+    # Initialize Redis connection (optional - don't fail startup if it fails)
     try:
-        await redis_manager.initialize()
+        await asyncio.wait_for(redis_manager.initialize(), timeout=2.0)
         logger.info("Redis connection initialized successfully")
+    except asyncio.TimeoutError:
+        logger.warning("Redis initialization timed out, continuing without Redis")
     except Exception as e:
-        logger.error(f"Failed to initialize Redis connection: {e}")
-        # Don't fail startup if Redis is unavailable
+        logger.warning(f"Redis connection failed, continuing without Redis: {e}")
     
-    # Start session cleanup task
+    # Start session cleanup task (optional - don't fail startup if it fails)
     try:
-        await session_manager.start_cleanup_task(interval_minutes=30)
+        await asyncio.wait_for(session_manager.start_cleanup_task(interval_minutes=30), timeout=1.0)
         logger.info("Session cleanup task started")
+    except asyncio.TimeoutError:
+        logger.warning("Session cleanup task startup timed out")
     except Exception as e:
-        logger.error(f"Failed to start session cleanup task: {e}")
+        logger.warning(f"Session cleanup task failed to start: {e}")
     
-    # Start callback manager background tasks
+    # Start callback manager background tasks (optional - don't fail startup if it fails)
     try:
-        await callback_manager.start_background_tasks()
+        await asyncio.wait_for(callback_manager.start_background_tasks(), timeout=1.0)
         logger.info("Callback manager background tasks started")
+    except asyncio.TimeoutError:
+        logger.warning("Callback manager startup timed out")
     except Exception as e:
-        logger.error(f"Failed to start callback manager: {e}")
+        logger.warning(f"Callback manager failed to start: {e}")
+    
+    logger.info("Application startup completed successfully - ready to serve requests")
 
 
 @app.on_event("shutdown")
