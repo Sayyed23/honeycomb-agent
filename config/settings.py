@@ -14,7 +14,7 @@ class DatabaseSettings(BaseSettings):
     
     url: str = Field(
         default="sqlite:///./test.db",
-        description="PostgreSQL database URL"
+        description="Database URL - defaults to SQLite"
     )
     
     echo: bool = Field(
