@@ -82,8 +82,9 @@ def verify_api_key(x_api_key: str = Header(...)):
     """
     Validates the mandatory 'x-api-key' header using .env configuration.
     """
-    expected_key = os.getenv("x_API_KEY") 
-    
+    # Accept x_API_KEY or X_API_KEY (Railway and others may show uppercase)
+    expected_key = os.getenv("x_API_KEY") or os.getenv("X_API_KEY")
+
     if not expected_key:
         logger.error("x_API_KEY not found in environment")
         raise HTTPException(
