@@ -82,9 +82,9 @@ python test_deployment_quick.py
 Make sure these are set in Railway dashboard (not in .env file):
 ```
 ENVIRONMENT=production
-GEMINI_API_KEY=AQ.Ab8RN6IEnV3947SFSsNurw6leoPjLu9f5HNItUtqoF593d5gzA
-x_API_KEY=iR3PgIodG2xKOCsKa7eNK6HrVKMNHOpzQmfDD6wPs
-API_KEY_SECRET=95a803558aa2ee25732820868663eac100365b95f40e59a76fb1bc9bbab77f8e
+GEMINI_API_KEY=""
+x_API_KEY=""
+API_KEY_SECRET=""
 ```
 
 #### Redeploy if Needed
